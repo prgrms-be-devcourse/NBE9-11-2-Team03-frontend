@@ -59,7 +59,7 @@ export default function RootLayout({
 
         <footer className="border-t border-slate-200 bg-white">
           <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4 text-sm text-slate-500 sm:px-6 lg:px-8">
-            <p>© {new Date().getFullYear()} 축제삼삼오오</p>
+            <p>© {new Date().getFullYear()} 오늘의 축제</p>
             <p>즐거운 축제를 더 쉽게 찾아보세요.</p>
           </div>
         </footer>
