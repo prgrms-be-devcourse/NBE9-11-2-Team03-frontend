@@ -19,7 +19,6 @@ type MeResponse = {
   message: string;
   data: MyInfo;
 };
-
 type ApiErrorResponse = {
   status: number;
   message: string;
@@ -192,7 +191,7 @@ export default function MyPage() {
 
       closeWithdrawModal();
       alert("회원 탈퇴가 성공적으로 처리되었습니다. 그동안 이용해 주셔서 감사합니다.");
-      
+
       window.location.href = "/login";
     } catch (err) {
       setWithdrawError(
