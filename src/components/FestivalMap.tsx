@@ -23,6 +23,11 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
     const [markers, setMarkers] = useState<any[]>([]);
 
     const fetchNearbyFestivals = async (lat: number, lng: number, r: number) => {
+        if (typeof r !== "number" || Number.isNaN(r)) {
+            console.warn("Invalid radiusKm for festival fetch", r);
+            return;
+        }
+
         try {
             const response = await fetch(`/api/festivals/nearby?mapX=${lng}&mapY=${lat}&radiusKm=${r}`);
             const resData = await response.json();
