@@ -190,6 +190,25 @@ export default function AdminPage() {
         }
     };
 
+    //축제 데이터 동기화 간, 공통 안전 파싱 함수 추가
+    const parseApiResponse = async (response: Response) => {
+        const raw = await response.text();
+
+        let body: any = null;
+        let isJson = false;
+
+        try {
+            body = raw ? JSON.parse(raw) : null;
+            isJson = true;
+        } catch {
+            body = null;
+            isJson = false;
+        }
+
+        return { raw, body, isJson };
+    };
+
+
     //축제 관리자 API 연결 함수 추가
     const runFestivalSyncAndEnrich = async () => {
         setFestivalActionLoading(true);
@@ -206,7 +225,7 @@ export default function AdminPage() {
 
         try {
             const response = await fetch(
-                `/api/admin/festivals/sync-and-enrich?pageNo=1&numOfRows=300&eventStartDate=20260101`,
+                `/api/admin/festivals/sync-and-enrich?pageNo=1&numOfRows=100&eventStartDate=20260101`,
                 {
                     method: "POST",
                     headers: {
@@ -216,20 +235,24 @@ export default function AdminPage() {
                 }
             );
 
-            const body = await response.json();
+            const { raw, body } = await parseApiResponse(response);
 
             if (response.ok) {
                 setLastFestivalAction("sync");
-                setFestivalActionMessage(body.message || "축제 목록 동기화가 완료되었습니다.");
-                setFestivalSyncResult(body.data ?? null);
+                setFestivalActionMessage(body?.message || "축제 목록 동기화가 완료되었습니다.");
+                setFestivalSyncResult(body?.data ?? null);
                 void fetchFestivalSyncStatus({ clearResult: false });
             } else {
-                setFestivalActionError(body.message || "축제 동기화 실행에 실패했습니다.");
+                setFestivalActionError(
+                    body?.message || raw || "축제 동기화 실행에 실패했습니다."
+                );
                 setFestivalSyncResult(null);
             }
         } catch (error) {
             console.error("축제 동기화 실행 오류:", error);
-            setFestivalActionError("서버 통신 중 오류가 발생했습니다.");
+            setFestivalActionError(
+                error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다."
+            );
             setFestivalSyncResult(null);
         } finally {
             setFestivalActionLoading(false);
@@ -258,20 +281,24 @@ export default function AdminPage() {
                 },
             });
 
-            const body = await response.json();
+            const { raw, body } = await parseApiResponse(response);
 
             if (response.ok) {
                 setLastFestivalAction("retry");
-                setFestivalActionMessage(body.message || "축제 상세 보강 재처리가 완료되었습니다.");
-                setFestivalSyncResult(body.data ?? null);
+                setFestivalActionMessage(body?.message || "축제 상세 보강 재처리가 완료되었습니다.");
+                setFestivalSyncResult(body?.data ?? null);
                 void fetchFestivalSyncStatus({ clearResult: false });
             } else {
-                setFestivalActionError(body.message || "축제 상세 재처리에 실패했습니다.");
+                setFestivalActionError(
+                    body?.message || raw || "축제 상세 재처리에 실패했습니다."
+                );
                 setFestivalSyncResult(null);
             }
         } catch (error) {
             console.error("축제 상세 재처리 오류:", error);
-            setFestivalActionError("서버 통신 중 오류가 발생했습니다.");
+            setFestivalActionError(
+                error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다."
+            );
             setFestivalSyncResult(null);
         } finally {
             setFestivalActionLoading(false);
@@ -307,18 +334,22 @@ export default function AdminPage() {
                     },
                 });
 
-                const body = await response.json();
+                const { raw, body } = await parseApiResponse(response);
 
                 if (response.ok) {
-                    setFestivalActionMessage(body.message || "동기화 상태 조회가 완료되었습니다.");
-                    setFestivalSyncStatus(body.data ?? null);
+                    setFestivalActionMessage(body?.message || "동기화 상태 조회가 완료되었습니다.");
+                    setFestivalSyncStatus(body?.data ?? null);
                 } else {
-                    setFestivalActionError(body.message || "동기화 상태 조회에 실패했습니다.");
+                    setFestivalActionError(
+                        body?.message || raw || "동기화 상태 조회에 실패했습니다."
+                    );
                     setFestivalSyncStatus(null);
                 }
             } catch (error) {
                 console.error("축제 동기화 상태 조회 오류:", error);
-                setFestivalActionError("서버 통신 중 오류가 발생했습니다.");
+                setFestivalActionError(
+                    error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다."
+                );
                 setFestivalSyncStatus(null);
             } finally {
                 setFestivalActionLoading(false);
