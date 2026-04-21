@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import FestivalMap from "@/components/FestivalMap";
 import { useRouter } from "next/navigation";
+import BookMarkButton from "@/components/BookMarkButton";
 
 const REGIONS = [
     { code: "", name: "전체지역" },
@@ -112,7 +113,7 @@ export default function MainPage() {
                 <button
                     onClick={() => {
                         setViewMode("list");
-                        sessionStorage.setItem("festivalViewMode", "list"); 
+                        sessionStorage.setItem("festivalViewMode", "list");
                     }}
                     className={`px-8 py-3 font-bold text-lg transition-colors ${viewMode === "list" ? "bg-gray-200 text-black" : "bg-white text-gray-500 hover:bg-gray-50"}`}
                 >
@@ -121,7 +122,7 @@ export default function MainPage() {
                 <button
                     onClick={() => {
                         setViewMode("map");
-                        sessionStorage.setItem("festivalViewMode", "map"); 
+                        sessionStorage.setItem("festivalViewMode", "map");
                     }}
                     className={`px-8 py-3 font-bold text-lg border-l border-gray-300 transition-colors ${viewMode === "map" ? "bg-gray-200 text-black" : "bg-white text-gray-500 hover:bg-gray-50"}`}
                 >
@@ -289,16 +290,19 @@ export default function MainPage() {
                                         <span className={`absolute top-3 left-3 text-sm font-bold px-3 py-1.5 rounded shadow-md ${uiStatus.bg} ${uiStatus.text}`}>
                                             {uiStatus.label}
                                         </span>
-                                        <span className="absolute top-3 right-3 text-4xl text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] hover:text-red-500 transition-colors">
-                                            ♥
-                                        </span>
+                                        <BookMarkButton
+                                            festivalId={festival.id}
+                                            initialIsBookmarked={festival.isBookmarked}
+                                            isSmall={true}
+                                            className="absolute top-3 right-3 z-10"
+                                        />
                                     </div>
 
                                     <div className="flex flex-col gap-3">
                                         <div className="flex items-start gap-3">
                                             <span className="bg-[#e0e0e0] text-sm font-bold px-2 py-1 rounded whitespace-nowrap mt-1">축제명</span>
                                             <span className="font-bold text-gray-900 text-xl line-clamp-2 leading-snug">{festival.title}</span>
-                                                                                    </div>
+                                        </div>
                                         <div className="flex items-center gap-3">
                                             <span className="bg-[#e0e0e0] text-sm font-bold px-2 py-1 rounded whitespace-nowrap">기간</span>
                                             <span className="text-gray-600 text-base font-medium">

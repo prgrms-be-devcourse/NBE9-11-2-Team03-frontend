@@ -2,6 +2,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Map, MapMarker, useKakaoLoader } from "react-kakao-maps-sdk";
+import BookMarkButton from "@/components/BookMarkButton";
 
 export default function FestivalDetailPage() {
     const params = useParams();
@@ -48,7 +49,7 @@ export default function FestivalDetailPage() {
 
     const handleTabChange = (tab: "overview" | "location" | "review") => {
         setActiveTab(tab);
-        setIsExpanded(false); // 무조건 '접힘' 상태로 초기화!
+        setIsExpanded(false); 
     };
 
     if (!festival) return <div className="w-full h-screen flex justify-center items-center text-gray-400 font-bold">축제 정보를 불러오는 중입니다...</div>;
@@ -58,8 +59,22 @@ export default function FestivalDetailPage() {
     return (
         <div className="max-w-[1200px] mx-auto px-6 py-12 min-h-screen text-gray-900">
                 
-                {/* 💡 2. 상단 요약 카드 영역 (시안 반영) */}
-            <div className="bg-white p-8 md:p-10 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-10 mb-10">
+                <div className="bg-white p-8 md:p-10 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-10 mb-10 relative">
+                
+                <div className="absolute top-8 right-8 md:top-10 md:right-10 z-10">
+                    <BookMarkButton 
+                        festivalId={festival.id} 
+                        initialIsBookmarked={festival.isBookmarked || false}
+                        onToggle={(newIsBookmarked, newCount) => {
+                            setFestival((prev: any) => ({
+                                ...prev,
+                                isBookmarked: newIsBookmarked,
+                                bookMarkCount: newCount
+                            }));
+                        }}
+                    />
+                </div>
+
                 {/* 왼쪽 포스터 */}
                 <div className="w-full md:w-[280px] shrink-0 aspect-[3/4] bg-gray-50 rounded-xl overflow-hidden border border-gray-100 relative">
                     {festival.firstImageUrl ? (
@@ -108,7 +123,7 @@ export default function FestivalDetailPage() {
                 </div>
             </div>
 
-            {/* 💡 3. 탭(Tab) 메뉴 영역 */}
+            {/*  3. 탭(Tab) 메뉴 영역 */}
             <div className="flex gap-8 border-b border-gray-200 mb-8 px-2">
             <button 
                     onClick={() => handleTabChange("overview")}
@@ -130,7 +145,7 @@ export default function FestivalDetailPage() {
                 </button>
             </div>
 
-            {/* 💡 4. 탭 콘텐츠 영역 (조건부 렌더링) */}
+            {/*  4. 탭 콘텐츠 영역 (조건부 렌더링) */}
             <div className="min-h-[400px]">
                 
                 {/* [소개 탭] */}
