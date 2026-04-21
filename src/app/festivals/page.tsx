@@ -37,8 +37,15 @@ const RADIUS_STEPS = [5, 10, 20, 30, 50, 100, 300, 500];
 export default function MainPage() {
     const router = useRouter();
     const [viewMode, setViewMode] = useState<"list" | "map">("list");
-    const [festivals, setFestivals] = useState<any[]>([]);
 
+    useEffect(() => {
+        const savedView = sessionStorage.getItem("festivalViewMode") as "list" | "map";
+        if (savedView === "list" || savedView === "map") {
+            setViewMode(savedView);
+        }
+    }, []);
+
+    const [festivals, setFestivals] = useState<any[]>([]);
     const [currentPage, setCurrentPage] = useState(0); // API가 0부터 시작한다고 가정
     const [totalPages, setTotalPages] = useState(0);
 
@@ -50,7 +57,6 @@ export default function MainPage() {
     const [status, setStatus] = useState<"ALL" | "ONGOING" | "UPCOMING" | "ENDED">("ALL");
     const [sort, setSort] = useState("startDate,asc");
 
-    // 💡 반경 인덱스 상태 (0 ~ 7)
     const [radiusIndex, setRadiusIndex] = useState(0);
     const currentRadius = RADIUS_STEPS[radiusIndex];
 
@@ -104,13 +110,19 @@ export default function MainPage() {
             {/* 뷰 토글 영역 */}
             <div className="flex gap-0 mb-6 border border-gray-300 w-fit rounded overflow-hidden shadow-sm bg-white">
                 <button
-                    onClick={() => setViewMode("list")}
+                    onClick={() => {
+                        setViewMode("list");
+                        sessionStorage.setItem("festivalViewMode", "list"); 
+                    }}
                     className={`px-8 py-3 font-bold text-lg transition-colors ${viewMode === "list" ? "bg-gray-200 text-black" : "bg-white text-gray-500 hover:bg-gray-50"}`}
                 >
                     리스트뷰
                 </button>
                 <button
-                    onClick={() => setViewMode("map")}
+                    onClick={() => {
+                        setViewMode("map");
+                        sessionStorage.setItem("festivalViewMode", "map"); 
+                    }}
                     className={`px-8 py-3 font-bold text-lg border-l border-gray-300 transition-colors ${viewMode === "map" ? "bg-gray-200 text-black" : "bg-white text-gray-500 hover:bg-gray-50"}`}
                 >
                     지도뷰
@@ -270,7 +282,7 @@ export default function MainPage() {
                                 <div key={festival.id} onClick={() => router.push(`/festivals/${festival.id}`)} className="border border-gray-300 p-5 flex flex-col bg-white cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group rounded-lg">
                                     <div className="bg-[#f0f0f0] h-64 flex items-center justify-center mb-5 relative overflow-hidden rounded-md">
                                         {festival.thumbnail ? (
-                                            <img src={festival.thumbnail} alt={festival.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                            <img src={festival.thumbnail} alt={festival.title} className="w-full h-full object-contain p-2 transition-transform duration-500 group-hover:scale-105" />
                                         ) : (
                                             <span className="text-gray-400 font-bold text-xl">축제 이미지</span>
                                         )}
@@ -285,8 +297,8 @@ export default function MainPage() {
                                     <div className="flex flex-col gap-3">
                                         <div className="flex items-start gap-3">
                                             <span className="bg-[#e0e0e0] text-sm font-bold px-2 py-1 rounded whitespace-nowrap mt-1">축제명</span>
-                                            <span className="font-bold text-gray-900 text-2xl line-clamp-2 leading-snug">{festival.title}</span>
-                                        </div>
+                                            <span className="font-bold text-gray-900 text-xl line-clamp-2 leading-snug">{festival.title}</span>
+                                                                                    </div>
                                         <div className="flex items-center gap-3">
                                             <span className="bg-[#e0e0e0] text-sm font-bold px-2 py-1 rounded whitespace-nowrap">기간</span>
                                             <span className="text-gray-600 text-base font-medium">
