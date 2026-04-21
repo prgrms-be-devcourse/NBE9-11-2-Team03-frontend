@@ -39,6 +39,7 @@ type ReviewItem = {
     likeCount: number;
     reportCount: number;
     createdAt: string;
+    liked: boolean;
 };
 
 type ReviewPageResponse = {
@@ -365,6 +366,50 @@ export default function FestivalDetailPage() {
     }
 };
 
+    // 리뷰 좋아요/좋아요 취소
+    const handleLikeReview = async (reviewId: number, isLiked: boolean) => {
+    if (!isLoggedIn) {
+        alert("로그인 후 좋아요를 누를 수 있습니다.");
+        return;
+    }
+
+    try {
+        const token = getAccessToken();
+
+        const response = await fetch(`/api/reviews/${reviewId}/like`, {
+            method: isLiked ? "DELETE" : "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || "좋아요 처리에 실패했습니다.");
+        }
+
+        // 1. 프론트 상태를 즉시 갱신
+        setReviews((prev) =>
+            prev.map((review) =>
+                review.reviewId === reviewId
+                    ? {
+                          ...review,
+                          liked: result.data.isLiked,
+                          likeCount: result.data.likeCount,
+                      }
+                    : review
+            )
+        );
+
+        
+
+    } catch (error: any) {
+        alert(error.message || "좋아요 처리 중 오류가 발생했습니다.");
+    }
+};
+
 
 
 
@@ -656,10 +701,23 @@ export default function FestivalDetailPage() {
                                         </p>
                                     </div>
 
-                                    {/* 리뷰 하단 버튼 영역 */}
+                                {/* 리뷰 하단 버튼 영역 */}
+                                <div className="mt-6 flex justify-between items-center border-t border-gray-50 pt-4">
+                                    {/* 왼쪽: 좋아요 버튼 */}
+                                    <button
+                                        onClick={() => handleLikeReview(review.reviewId, review.liked)}
+                                        className={`px-3 py-1 text-sm font-bold transition-colors ${
+                                            review.liked
+                                                ? "text-blue-600 hover:text-blue-700"
+                                                : "text-gray-400 hover:text-gray-900"
+                                        }`}
+                                    >
+                                        {review.liked ? "좋아요 취소" : "좋아요"} ({review.likeCount})
+                                    </button>
+
+                                    {/* 오른쪽: 내가 쓴 리뷰면 수정/삭제, 남이 쓴 리뷰면 신고 */}
                                     {isMyReview ? (
-                                        /* 내가 작성한 리뷰 */
-                                        <div className="mt-6 flex justify-end gap-3 border-t border-gray-50 pt-4">
+                                        <div className="flex gap-3">
                                             <button
                                                 onClick={() => handleEditClick(review)}
                                                 className="px-3 py-1 text-sm font-bold text-gray-400 hover:text-gray-900 transition-colors"
@@ -675,8 +733,7 @@ export default function FestivalDetailPage() {
                                             </button>
                                         </div>
                                     ) : (
-                                        /* 다른 사람 리뷰 */
-                                        <div className="mt-6 flex justify-end gap-3 border-t border-gray-50 pt-4">
+                                        <div className="flex gap-3">
                                             <button
                                                 onClick={() => handleReportReview(review.reviewId)}
                                                 className="px-3 py-1 text-sm font-bold text-red-500 hover:text-red-700 transition-colors"
@@ -685,8 +742,8 @@ export default function FestivalDetailPage() {
                                             </button>
                                         </div>
                                     )}
-
-                                    </div>
+                                </div>
+                                </div>
 
                             );
                         })}
