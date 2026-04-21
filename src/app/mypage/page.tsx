@@ -1,10 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  ACCESS_TOKEN_STORAGE_KEY,
-  REFRESH_TOKEN_STORAGE_KEY,
-} from "@/lib/jwtDisplay";
+import { clearAccessToken, fetchWithAuth } from "@/lib/authToken";
 
 type MyInfo = {
   memberId: number;
@@ -136,20 +133,12 @@ export default function MyPage() {
       return;
     }
 
-    const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
-    if (!accessToken) {
-      setIsLoggedIn(false);
-      closeWithdrawModal();
-      return;
-    }
-
     setWithdrawSubmitting(true);
 
     try {
-      const response = await fetch(`/api/users/me/withdraw`, {
+      const response = await fetchWithAuth(`/api/users/me/withdraw`, {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -170,26 +159,14 @@ export default function MyPage() {
             : `회원 탈퇴 실패 (${response.status})`;
 
         if (response.status === 401) {
-          try {
-            localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
-            localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
-          } catch {
-            // ignore
-          }
           setIsLoggedIn(false);
         }
 
         throw new Error(message);
       }
 
-      try {
-        localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
-        localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
-      } catch {
-        // ignore
-      }
-
       closeWithdrawModal();
+      clearAccessToken();
       alert("회원 탈퇴가 성공적으로 처리되었습니다. 그동안 이용해 주셔서 감사합니다.");
 
       window.location.href = "/login";
@@ -212,22 +189,11 @@ export default function MyPage() {
     setLoading(true);
     setError(null);
 
-    const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
-    if (!accessToken) {
-      setIsLoggedIn(false);
-      setMyInfo(null);
-      setLoading(false);
-      return;
-    }
-
     setIsLoggedIn(true);
 
     try {
-      const response = await fetch(`/api/users/me`, {
+      const response = await fetchWithAuth(`/api/users/me`, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
       });
 
       const body = (await response.json().catch(() => null)) as
@@ -242,12 +208,6 @@ export default function MyPage() {
             : `내 정보 조회 실패 (${response.status})`;
 
         if (response.status === 401) {
-          try {
-            localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
-            localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
-          } catch {
-            // ignore
-          }
           setIsLoggedIn(false);
         }
 
@@ -273,13 +233,6 @@ export default function MyPage() {
   }, [fetchMyInfo]);
 
   const fetchMyReviews = useCallback(async (page: number) => {
-    const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
-    if (!accessToken) {
-      setIsLoggedIn(false);
-      setMyReviews(null);
-      return;
-    }
-
     setReviewsLoading(true);
     setReviewsError(null);
 
@@ -290,11 +243,8 @@ export default function MyPage() {
       });
       query.append("sort", "createdAt,desc");
 
-      const response = await fetch(`/api/users/me/reviews?${query.toString()}`, {
+      const response = await fetchWithAuth(`/api/users/me/reviews?${query.toString()}`, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
       });
 
       const body = (await response.json().catch(() => null)) as
@@ -309,12 +259,6 @@ export default function MyPage() {
             : `내 리뷰 조회 실패 (${response.status})`;
 
         if (response.status === 401) {
-          try {
-            localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
-            localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
-          } catch {
-            // ignore
-          }
           setIsLoggedIn(false);
         }
 
@@ -341,13 +285,6 @@ export default function MyPage() {
   }, [activeTab, fetchMyReviews, reviewsPage]);
 
   const fetchMyBookmarks = useCallback(async (page: number) => {
-    const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
-    if (!accessToken) {
-      setIsLoggedIn(false);
-      setMyBookmarks(null);
-      return;
-    }
-
     setBookmarksLoading(true);
     setBookmarksError(null);
 
@@ -358,13 +295,10 @@ export default function MyPage() {
       });
       query.append("sort", "createdAt,desc");
 
-      const response = await fetch(
+      const response = await fetchWithAuth(
         `/api/users/me/bookmarks?${query.toString()}`,
         {
           method: "GET",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
         },
       );
 
@@ -380,12 +314,6 @@ export default function MyPage() {
             : `찜 목록 조회 실패 (${response.status})`;
 
         if (response.status === 401) {
-          try {
-            localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
-            localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
-          } catch {
-            // ignore
-          }
           setIsLoggedIn(false);
         }
 

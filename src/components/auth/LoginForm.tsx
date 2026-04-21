@@ -3,17 +3,13 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { AuthTextField } from "@/components/auth/AuthTextField";
-import {
-  ACCESS_TOKEN_STORAGE_KEY,
-  REFRESH_TOKEN_STORAGE_KEY,
-} from "@/lib/jwtDisplay";
+import { saveAccessToken } from "@/lib/authToken";
 
 type LoginResponse = {
   status?: number | string;
   message?: string;
   data?: {
     accessToken?: string;
-    refreshToken?: string;
   };
 };
 
@@ -56,6 +52,7 @@ export function LoginForm() {
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -64,16 +61,19 @@ export function LoginForm() {
       const body = (await response.json().catch(() => null)) as LoginResponse | null;
       const status = String(body?.status ?? response.status);
 
-      if (!response.ok || status !== "200" || !body?.data?.accessToken) {
+      if (!response.ok || status !== "200") {
         setErrors(getLoginError(body));
         return;
       }
 
-      localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, body.data.accessToken);
-      if (body.data.refreshToken) {
-        localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, body.data.refreshToken);
+      const accessToken = body?.data?.accessToken;
+
+      if (!accessToken) {
+        setErrors({ form: "로그인은 성공했지만 accessToken을 받지 못했습니다." });
+        return;
       }
 
+      saveAccessToken(accessToken);
       window.location.assign("/");
     } catch {
       setErrors({ form: "서버와 연결할 수 없습니다. 잠시 후 다시 시도해 주세요." });

@@ -2,60 +2,64 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSyncExternalStore } from "react";
-import {
-  ACCESS_TOKEN_STORAGE_KEY,
-  REFRESH_TOKEN_STORAGE_KEY,
-  getUserDisplayName,
-  isTokenActive,
-} from "@/lib/jwtDisplay";
+import { useEffect, useState } from "react";
+import { clearAccessToken, fetchWithAuth } from "@/lib/authToken";
 
-const AUTH_STORAGE_EVENT = "auth-storage";
-
-function clearStoredTokens() {
-  localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
-}
-
-function getStoredAuthToken() {
-  if (typeof window === "undefined") return "";
-
-  const access = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
-  if (access && isTokenActive(access)) return access;
-
-  const refresh = localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
-  if (refresh && isTokenActive(refresh)) return refresh;
-
-  if (access || refresh) {
-    clearStoredTokens();
-  }
-
-  return "";
-}
-
-function subscribeAuthStorage(onStoreChange: () => void) {
-  window.addEventListener("storage", onStoreChange);
-  window.addEventListener(AUTH_STORAGE_EVENT, onStoreChange);
-
-  return () => {
-    window.removeEventListener("storage", onStoreChange);
-    window.removeEventListener(AUTH_STORAGE_EVENT, onStoreChange);
+type MeResponse = {
+  data?: {
+    nickname?: string;
+    email?: string;
   };
-}
+};
 
 export function SiteHeader() {
   const router = useRouter();
-  const authToken = useSyncExternalStore(
-    subscribeAuthStorage,
-    getStoredAuthToken,
-    () => "",
-  );
-  const loggedIn = Boolean(authToken);
-  const displayName = authToken ? getUserDisplayName(authToken) : null;
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [displayName, setDisplayName] = useState<string | null>(null);
 
-  const handleLogout = () => {
-    clearStoredTokens();
-    window.dispatchEvent(new Event(AUTH_STORAGE_EVENT));
+  useEffect(() => {
+    let active = true;
+
+    const loadMe = async () => {
+      try {
+        const response = await fetchWithAuth("/api/users/me");
+        const body = (await response.json().catch(() => null)) as MeResponse | null;
+
+        if (!active) return;
+
+        if (!response.ok || !body?.data) {
+          setLoggedIn(false);
+          setDisplayName(null);
+          return;
+        }
+
+        setLoggedIn(true);
+        setDisplayName(body.data.nickname ?? body.data.email ?? "회원");
+      } catch {
+        if (!active) return;
+        setLoggedIn(false);
+        setDisplayName(null);
+      }
+    };
+
+    void loadMe();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await fetchWithAuth("/api/auth/logout", {
+        method: "POST",
+      });
+    } catch {
+      // 화면 상태는 아래에서 정리한다.
+    }
+    clearAccessToken();
+    setLoggedIn(false);
+    setDisplayName(null);
     router.push("/login");
     router.refresh();
   };

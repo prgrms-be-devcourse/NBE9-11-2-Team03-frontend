@@ -71,7 +71,7 @@ export function SignupForm() {
       const body = (await response.json().catch(() => null)) as SignupResponse | null;
       const status = String(body?.status ?? response.status);
 
-      if (!response.ok || status !== "200") {
+      if (!response.ok || (status !== "200" && status !== "201")) {
         setErrors(getSignupError(body));
         return;
       }
