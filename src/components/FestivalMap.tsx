@@ -1,13 +1,18 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Map, MapMarker, useKakaoLoader, ZoomControl } from "react-kakao-maps-sdk";
+import {
+    Map,
+    MapMarker,
+    useKakaoLoader,
+    ZoomControl,
+} from "react-kakao-maps-sdk";
 import { useRouter } from "next/navigation";
 
 interface FestivalMapProps {
-    radiusKm: number; 
+    radiusKm?: number; 
 }
 
-export default function FestivalMap({ radiusKm }: FestivalMapProps) {
+export default function FestivalMap({ radiusKm = 500 }: FestivalMapProps) {
     const router = useRouter();
     const [loading, error] = useKakaoLoader({
         appkey: "66f9dd9bdc448822d3712fc5a4994579",
@@ -20,6 +25,7 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
     // 2. 지도가 보여주는 화면의 중심 (전국 단위일 때 중앙으로 옮기기 위함)
     const [mapCenter, setMapCenter] = useState({ lat: 37.5665, lng: 126.9780 });
     
+    const [map, setMap] = useState<kakao.maps.Map | null>(null);
     const [markers, setMarkers] = useState<any[]>([]);
 
     const fetchNearbyFestivals = async (lat: number, lng: number, r: number) => {
@@ -68,10 +74,30 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
         }
     }, [radiusKm, myPos]); 
 
+    useEffect(() => {
+        if (!map) return;
+
+        const relayoutMap = () => {
+            map.relayout();
+            map.setCenter(new kakao.maps.LatLng(mapCenter.lat, mapCenter.lng));
+        };
+
+        const firstRelayout = window.setTimeout(relayoutMap, 0);
+        const secondRelayout = window.setTimeout(relayoutMap, 250);
+
+        window.addEventListener("resize", relayoutMap);
+
+        return () => {
+            window.clearTimeout(firstRelayout);
+            window.clearTimeout(secondRelayout);
+            window.removeEventListener("resize", relayoutMap);
+        };
+    }, [map, mapCenter]);
+
     const getZoomLevel = (r: number) => {
-        if (r >= 500) return 13; // 전국
-        if (r >= 300) return 12; // 남한 전체
-        if (r >= 100) return 11; // 광역권 (서울/경기 등)
+        if (r >= 500) return 12; // 전국
+        if (r >= 300) return 11; // 남한 전체
+        if (r >= 100) return 10; // 광역권 (서울/경기 등)
         if (r >= 50) return 10;
         if (r >= 30) return 9;
         if (r >= 20) return 8;
@@ -88,8 +114,9 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
             style={{ width: "100%", height: "100%" }} 
             level={getZoomLevel(radiusKm)}
             isPanto={true} 
+            onCreate={setMap}
         >
-            <ZoomControl position={"RIGHT_TOP"} />
+            <ZoomControl position="TOPRIGHT" />
             
             {/* 내 위치는 항상 그 자리에 파란색 기본 마커로 고정 */}
             <MapMarker position={myPos} />

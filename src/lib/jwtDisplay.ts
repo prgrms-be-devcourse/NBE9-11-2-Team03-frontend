@@ -1,4 +1,5 @@
 export type JwtPayload = {
+  exp?: number;
   name?: string;
   nickname?: string;
   username?: string;
@@ -35,4 +36,12 @@ export function parseJwtPayload(token: string): JwtPayload | null {
 export function getUserDisplayName(token: string): string {
   const payload = parseJwtPayload(token);
   return payload?.name ?? payload?.nickname ?? payload?.username ?? payload?.sub ?? "회원";
+}
+
+export function isTokenActive(token: string): boolean {
+  const payload = parseJwtPayload(token);
+  if (!payload) return false;
+  if (!payload.exp) return true;
+
+  return payload.exp * 1000 > Date.now();
 }
