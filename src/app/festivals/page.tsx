@@ -72,7 +72,7 @@ export default function MainPage() {
             if (sort) params.append("sort", sort);
 
             params.append("page", currentPage.toString());
-            params.append("size", "10"); // 백엔드 설정에 따라 조절 가능
+            params.append("size", "12"); // 백엔드 설정에 따라 조절 가능
 
             const response = await fetch(`/api/festivals?${params.toString()}`);
             const resData = await response.json();
