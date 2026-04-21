@@ -225,7 +225,7 @@ export default function AdminPage() {
 
         try {
             const response = await fetch(
-                `/api/admin/festivals/sync-and-enrich?pageNo=1&numOfRows=300&eventStartDate=20260101`,
+                `http://localhost:8080/api/admin/festivals/sync-and-enrich?pageNo=1&numOfRows=200&eventStartDate=20260101`,
                 {
                     method: "POST",
                     headers: {
@@ -253,11 +253,11 @@ export default function AdminPage() {
                 if (latestStatus) {
                     if (latestStatus.pendingCount === 0) {
                         setFestivalActionError(
-                            "응답 처리 중 오류가 발생했지만, 현재 동기화 상태는 정상입니다."
+                            "응답을 정상적으로 받지 못했지만, 현재 상세 동기화 미완료 대상은 없습니다. 동기화는 정상 반영되었을 수 있습니다."
                         );
                     } else {
                         setFestivalActionError(
-                            "응답 처리 중 오류가 발생했으며, 상세 동기화 일부가 미완료 상태입니다. 재처리가 필요합니다."
+                            "응답을 정상적으로 받지 못했지만, 현재 상세 동기화 일부가 미완료 상태입니다. 재처리가 필요합니다."
                         );
                     }
                 } else {
@@ -278,11 +278,11 @@ export default function AdminPage() {
             if (latestStatus) {
                 if (latestStatus.pendingCount === 0) {
                     setFestivalActionError(
-                        "응답 처리 중 오류가 발생했지만, 현재 동기화 상태는 정상입니다."
+                        "응답을 정상적으로 받지 못했지만, 현재 상세 동기화 미완료 대상은 없습니다. 동기화는 정상 반영되었을 수 있습니다."
                     );
                 } else {
                     setFestivalActionError(
-                        "응답 처리 중 오류가 발생했으며, 상세 동기화 일부가 미완료 상태입니다. 재처리가 필요합니다."
+                        "응답을 정상적으로 받지 못했지만, 현재 상세 동기화 일부가 미완료 상태입니다. 재처리가 필요합니다."
                     );
                 }
             } else {
