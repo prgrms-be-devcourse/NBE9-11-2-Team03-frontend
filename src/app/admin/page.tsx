@@ -225,7 +225,7 @@ export default function AdminPage() {
 
         try {
             const response = await fetch(
-                `/api/admin/festivals/sync-and-enrich?pageNo=1&numOfRows=100&eventStartDate=20260101`,
+                `/api/admin/festivals/sync-and-enrich?pageNo=1&numOfRows=300&eventStartDate=20260101`,
                 {
                     method: "POST",
                     headers: {
@@ -241,19 +241,55 @@ export default function AdminPage() {
                 setLastFestivalAction("sync");
                 setFestivalActionMessage(body?.message || "축제 목록 동기화가 완료되었습니다.");
                 setFestivalSyncResult(body?.data ?? null);
-                void fetchFestivalSyncStatus({ clearResult: false });
+                void fetchFestivalSyncStatus({ clearResult: false, silent: true });
             } else {
-                setFestivalActionError(
-                    body?.message || raw || "축제 동기화 실행에 실패했습니다."
-                );
                 setFestivalSyncResult(null);
+
+                const latestStatus = await fetchFestivalSyncStatus({
+                    clearResult: false,
+                    silent: true,
+                });
+
+                if (latestStatus) {
+                    if (latestStatus.pendingCount === 0) {
+                        setFestivalActionError(
+                            "응답 처리 중 오류가 발생했지만, 현재 동기화 상태는 정상입니다."
+                        );
+                    } else {
+                        setFestivalActionError(
+                            "응답 처리 중 오류가 발생했으며, 상세 동기화 일부가 미완료 상태입니다. 재처리가 필요합니다."
+                        );
+                    }
+                } else {
+                    setFestivalActionError(
+                        body?.message || raw || "축제 동기화 실행에 실패했습니다."
+                    );
+                }
             }
         } catch (error) {
             console.error("축제 동기화 실행 오류:", error);
-            setFestivalActionError(
-                error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다."
-            );
             setFestivalSyncResult(null);
+
+            const latestStatus = await fetchFestivalSyncStatus({
+                clearResult: false,
+                silent: true,
+            });
+
+            if (latestStatus) {
+                if (latestStatus.pendingCount === 0) {
+                    setFestivalActionError(
+                        "응답 처리 중 오류가 발생했지만, 현재 동기화 상태는 정상입니다."
+                    );
+                } else {
+                    setFestivalActionError(
+                        "응답 처리 중 오류가 발생했으며, 상세 동기화 일부가 미완료 상태입니다. 재처리가 필요합니다."
+                    );
+                }
+            } else {
+                setFestivalActionError(
+                    error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다."
+                );
+            }
         } finally {
             setFestivalActionLoading(false);
         }
@@ -306,11 +342,15 @@ export default function AdminPage() {
     };
 
     const fetchFestivalSyncStatus = useCallback(
-        async (options?: { clearResult?: boolean }) => {
+        async (options?: { clearResult?: boolean; silent?: boolean }) => {
             const clearResult = options?.clearResult ?? false;
+            const silent = options?.silent ?? false;
 
             setFestivalActionLoading(true);
-            setFestivalActionError(null);
+
+            if (!silent) {
+                setFestivalActionError(null);
+            }
 
             if (clearResult) {
                 setFestivalSyncResult(null);
@@ -322,7 +362,7 @@ export default function AdminPage() {
             if (!accessToken) {
                 alert("로그인이 필요합니다.");
                 window.location.href = "/login";
-                return;
+                return null;
             }
 
             try {
@@ -337,20 +377,34 @@ export default function AdminPage() {
                 const { raw, body } = await parseApiResponse(response);
 
                 if (response.ok) {
-                    setFestivalActionMessage(body?.message || "동기화 상태 조회가 완료되었습니다.");
-                    setFestivalSyncStatus(body?.data ?? null);
+                    const statusData = body?.data ?? null;
+                    setFestivalSyncStatus(statusData);
+
+                    if (!silent) {
+                        setFestivalActionMessage(body?.message || "동기화 상태 조회가 완료되었습니다.");
+                    }
+
+                    return statusData;
                 } else {
-                    setFestivalActionError(
-                        body?.message || raw || "동기화 상태 조회에 실패했습니다."
-                    );
+                    if (!silent) {
+                        setFestivalActionError(
+                            body?.message || raw || "동기화 상태 조회에 실패했습니다."
+                        );
+                    }
                     setFestivalSyncStatus(null);
+                    return null;
                 }
             } catch (error) {
                 console.error("축제 동기화 상태 조회 오류:", error);
-                setFestivalActionError(
-                    error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다."
-                );
+
+                if (!silent) {
+                    setFestivalActionError(
+                        error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다."
+                    );
+                }
+
                 setFestivalSyncStatus(null);
+                return null;
             } finally {
                 setFestivalActionLoading(false);
             }
@@ -566,7 +620,7 @@ export default function AdminPage() {
                     <div className="animate-in fade-in duration-300">
                         <div className="mb-6 flex items-center justify-between">
                             <h2 className="text-2xl font-bold text-slate-800">축제 데이터 관리</h2>
-                            <span className="text-sm text-slate-500">동기화 및 상세 재처리 관리</span>
+                            <span className="text-sm text-slate-500">목록 데이터 동기화 및 상세 재처리 관리</span>
                         </div>
 
                         <div className="space-y-6">
