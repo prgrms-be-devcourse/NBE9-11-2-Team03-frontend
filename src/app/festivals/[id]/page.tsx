@@ -108,6 +108,8 @@ export default function FestivalDetailPage() {
         rating: 5,
     });
 
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
     useEffect(() => {
         const fetchDetail = async () => {
             try {
@@ -639,9 +641,10 @@ export default function FestivalDetailPage() {
                                     <div className="flex flex-col md:flex-row gap-6 items-start">
                                         {review.image ? (
                                             <img
-                                                src={`http://localhost:8080/uploads/${review.image}`} // 서버 기본 주소 추가!
+                                                src={`http://localhost:8080/uploads/${review.image}`}
                                                 alt="리뷰 이미지"
-                                                className="w-24 h-24 rounded-xl border border-gray-100 shrink-0 object-cover shadow-inner"
+                                                className="w-24 h-24 rounded-xl border border-gray-100 shrink-0 object-cover shadow-inner cursor-pointer hover:opacity-80 transition-opacity"
+                                                onClick={() => setSelectedImage(`http://localhost:8080/uploads/${review.image}`)}
                                             />
                                         ) : (
                                             <div className="w-24 h-24 bg-gray-50 rounded-xl border border-gray-100 shrink-0 overflow-hidden shadow-inner flex items-center justify-center text-xs text-gray-400 font-bold">
@@ -692,6 +695,33 @@ export default function FestivalDetailPage() {
                                 >
                                     다음
                                 </button>
+                            </div>
+                        )}
+                        {selectedImage && (
+                            <div
+                                className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4 transition-opacity"
+                                onClick={() => setSelectedImage(null)} // 검은 배경 클릭 시 닫힘
+                            >
+                                <div className="relative max-w-4xl w-full flex flex-col items-center">
+                                    {/* 닫기 버튼 */}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedImage(null);
+                                        }}
+                                        className="absolute -top-12 right-0 text-white text-4xl hover:text-gray-300 transition-colors"
+                                    >
+                                        &times;
+                                    </button>
+
+                                    {/* 확대된 이미지 */}
+                                    <img
+                                        src={selectedImage}
+                                        alt="확대된 리뷰 이미지"
+                                        className="max-h-[85vh] w-auto object-contain rounded-lg shadow-2xl"
+                                        onClick={(e) => e.stopPropagation()} // 이미지 자체를 클릭했을 땐 안 닫히게 방어
+                                    />
+                                </div>
                             </div>
                         )}
                     </div>
