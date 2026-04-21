@@ -49,6 +49,18 @@ export function LoginForm() {
       password: String(formData.get("password") ?? ""),
     };
 
+    if (!payload.loginId) {
+      setErrors({ loginId: "아이디를 입력해주세요." });
+      setSubmitting(false);
+      return;
+    }
+
+    if (!payload.password) {
+      setErrors({ password: "비밀번호를 입력해주세요." });
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -135,19 +147,6 @@ export function LoginForm() {
         className="h-12 w-full rounded-md bg-blue-600 px-4 text-base font-bold text-white transition enabled:hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? "로그인 중..." : "로그인"}
-      </button>
-
-      <div className="flex items-center gap-3 text-xs font-bold text-slate-400">
-        <span className="h-px flex-1 bg-slate-200" />
-        또는
-        <span className="h-px flex-1 bg-slate-200" />
-      </div>
-
-      <button
-        type="button"
-        className="h-12 w-full rounded-md border border-slate-300 bg-slate-100 px-4 text-base font-bold text-slate-700 transition hover:bg-slate-200"
-      >
-        카카오로 계속하기
       </button>
     </form>
   );

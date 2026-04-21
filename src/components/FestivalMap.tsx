@@ -1,14 +1,30 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { Map, MapMarker, CustomOverlayMap, useKakaoLoader, ZoomControl } from "react-kakao-maps-sdk";
 import { useRouter } from "next/navigation";
 
+type FestivalMarker = {
+    id?: number | string;
+    festivalId?: number | string;
+    contentId?: number | string;
+    title?: string;
+    mapX?: number | string;
+    mapx?: number | string;
+    longitude?: number | string;
+    mapY?: number | string;
+    mapy?: number | string;
+    latitude?: number | string;
+};
+
+const DEFAULT_POS = { lat: 37.5665, lng: 126.9780 };
+const WIDE_MAP_CENTER = { lat: 36.3504, lng: 127.3845 };
+
 interface FestivalMapProps {
-    radiusKm: number;
+    radiusKm?: number;
 }
 
-export default function FestivalMap({ radiusKm }: FestivalMapProps) {
+export default function FestivalMap({ radiusKm = 500 }: FestivalMapProps) {
     const router = useRouter();
     const [loading, error] = useKakaoLoader({
         appkey: "66f9dd9bdc448822d3712fc5a4994579",
@@ -16,11 +32,10 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
     });
 
     const mapRef = useRef<kakao.maps.Map>(null);
-    const DEFAULT_POS = { lat: 37.5665, lng: 126.9780 };
 
     const [myPos, setMyPos] = useState(DEFAULT_POS);
     const [mapCenter, setMapCenter] = useState(DEFAULT_POS);
-    const [markers, setMarkers] = useState<any[]>([]);
+    const [markers, setMarkers] = useState<FestivalMarker[]>([]);
     const [isInitialGpsLoaded, setIsInitialGpsLoaded] = useState(false);
 
     // 반경(km)에 따른 지도 줌 레벨 설정
@@ -36,7 +51,7 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
     };
 
     // 주변 축제 데이터 페칭
-    const fetchNearbyFestivals = async (lat: number, lng: number, r: number) => {
+    const fetchNearbyFestivals = useCallback(async (lat: number, lng: number, r: number) => {
         try {
             const response = await fetch(`/api/festivals/nearby?mapX=${lng}&mapY=${lat}&radiusKm=${r}`);
             if (!response.ok) return;
@@ -46,12 +61,20 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
 
             setMarkers(fetchedMarkers);
         } catch {}
+    }, []);
+
+    const handleMapCreate = (map: kakao.maps.Map) => {
+        mapRef.current = map;
+        window.setTimeout(() => {
+            map.relayout();
+            map.setCenter(new kakao.maps.LatLng(mapCenter.lat, mapCenter.lng));
+        }, 0);
     };
 
     // 초기 GPS 위치 로드
     useEffect(() => {
         if (!navigator.geolocation) {
-            setIsInitialGpsLoaded(true);
+            window.setTimeout(() => setIsInitialGpsLoaded(true), 0);
             return;
         }
 
@@ -59,26 +82,41 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
             (pos) => {
                 const { latitude, longitude } = pos.coords;
                 setMyPos({ lat: latitude, lng: longitude });
-                setMapCenter(radiusKm >= 300 ? { lat: 36.3504, lng: 127.3845 } : { lat: latitude, lng: longitude });
+                setMapCenter(radiusKm >= 300 ? WIDE_MAP_CENTER : { lat: latitude, lng: longitude });
                 fetchNearbyFestivals(latitude, longitude, radiusKm);
                 setIsInitialGpsLoaded(true);
             },
             () => {
-                setMapCenter(radiusKm >= 300 ? { lat: 36.3504, lng: 127.3845 } : DEFAULT_POS);
+                setMapCenter(radiusKm >= 300 ? WIDE_MAP_CENTER : DEFAULT_POS);
                 fetchNearbyFestivals(DEFAULT_POS.lat, DEFAULT_POS.lng, radiusKm);
                 setIsInitialGpsLoaded(true);
             },
             { enableHighAccuracy: true }
         );
-    }, []);
+    }, [fetchNearbyFestivals, radiusKm]);
 
     // 반경 변경 시 데이터 리로드 및 중심점 이동
     useEffect(() => {
         if (!isInitialGpsLoaded) return;
 
-        fetchNearbyFestivals(myPos.lat, myPos.lng, radiusKm);
-        setMapCenter(radiusKm >= 300 ? { lat: 36.3504, lng: 127.3845 } : myPos);
-    }, [radiusKm, isInitialGpsLoaded]);
+        const timer = window.setTimeout(() => {
+            fetchNearbyFestivals(myPos.lat, myPos.lng, radiusKm);
+            setMapCenter(radiusKm >= 300 ? WIDE_MAP_CENTER : myPos);
+        }, 0);
+
+        return () => window.clearTimeout(timer);
+    }, [fetchNearbyFestivals, radiusKm, isInitialGpsLoaded, myPos]);
+
+    useEffect(() => {
+        if (!mapRef.current || loading || !isInitialGpsLoaded) return;
+
+        const timer = window.setTimeout(() => {
+            mapRef.current?.relayout();
+            mapRef.current?.setCenter(new kakao.maps.LatLng(mapCenter.lat, mapCenter.lng));
+        }, 0);
+
+        return () => window.clearTimeout(timer);
+    }, [loading, isInitialGpsLoaded, mapCenter]);
 
     const handlePanToMyPos = () => {
         mapRef.current?.panTo(new kakao.maps.LatLng(myPos.lat, myPos.lng));
@@ -100,25 +138,27 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
                 style={{ width: "100%", height: "100%" }}
                 isPanto={true}
                 ref={mapRef}
+                onCreate={handleMapCreate}
             >
-                <ZoomControl position={"RIGHT_TOP"} />
+                <ZoomControl position="TOPRIGHT" />
                 <MapMarker position={myPos} />
 
                 {markers.map((marker, index) => {
                     const lat = Number(marker.mapY || marker.mapy || marker.latitude);
                     const lng = Number(marker.mapX || marker.mapx || marker.longitude);
+                    const markerId = marker.id || marker.festivalId || marker.contentId;
 
                     if (!lat || !lng) return null;
 
                     return (
                         <CustomOverlayMap
-                            key={`festival-${marker.id || index}`}
+                            key={`festival-${markerId || index}`}
                             position={{ lat, lng }}
                             yAnchor={1}
                             zIndex={100}
                         >
                             <div
-                                onClick={() => router.push(`/festivals/${marker.id}`)}
+                                onClick={() => markerId && router.push(`/festivals/${markerId}`)}
                                 className="relative group cursor-pointer"
                                 style={{ width: '30px', height: '45px' }}
                             >

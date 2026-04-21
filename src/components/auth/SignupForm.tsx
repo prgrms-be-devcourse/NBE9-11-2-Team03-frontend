@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { AuthTextField } from "@/components/auth/AuthTextField";
@@ -154,31 +153,6 @@ export function SignupForm() {
         minLength={4}
         required
       />
-
-      <label className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-500">
-        <input
-          type="checkbox"
-          name="terms"
-          className="mt-1 h-4 w-4 rounded border-slate-300 accent-blue-600"
-          required
-        />
-        <span>
-          <Link
-            href="#"
-            className="font-bold text-blue-600 hover:text-blue-700"
-          >
-            이용약관
-          </Link>
-          과{" "}
-          <Link
-            href="#"
-            className="font-bold text-blue-600 hover:text-blue-700"
-          >
-            개인정보 처리방침
-          </Link>
-          에 동의합니다.
-        </span>
-      </label>
 
       {successMessage ? (
         <p className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700" aria-live="polite">

@@ -20,8 +20,8 @@ export default function Home() {
       </div>
 
       {/* 지도 영역 */}
-      <div className="border shadow-lg rounded-xl overflow-hidden">
-        <FestivalMap />
+      <div className="h-[650px] min-h-[520px] overflow-hidden rounded-xl border shadow-lg">
+        <FestivalMap radiusKm={500} />
       </div>
     </main>
   );
