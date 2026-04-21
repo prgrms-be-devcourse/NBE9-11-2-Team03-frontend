@@ -332,6 +332,42 @@ export default function FestivalDetailPage() {
         }
     };
 
+    // 리뷰 신고하기
+    const handleReportReview = async (reviewId: number) => {
+    if (!isLoggedIn) {
+        alert("로그인 후 신고할 수 있습니다.");
+        return;
+    }
+
+    const ok = confirm("이 리뷰를 신고하시겠습니까?");
+    if (!ok) return;
+
+    try {
+        const token = getAccessToken();
+
+        const response = await fetch(`/api/reviews/${reviewId}/reports`, {
+            method: "POST",
+            headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || "신고에 실패했습니다.");
+        }
+
+        alert("리뷰 신고가 접수되었습니다.");
+        fetchReviews(reviewPage);
+    } catch (error: any) {
+        alert(error.message || "신고 처리 중 오류가 발생했습니다.");
+    }
+};
+
+
+
+
     if (!festival) return <div className="w-full h-screen flex justify-center items-center text-gray-400 font-bold">축제 정보를 불러오는 중입니다...</div>;
 
     const uiStatus = getStatusUI(festival.startDate, festival.endDate);
@@ -620,7 +656,9 @@ export default function FestivalDetailPage() {
                                         </p>
                                     </div>
 
-                                    {isMyReview && (
+                                    {/* 리뷰 하단 버튼 영역 */}
+                                    {isMyReview ? (
+                                        /* 내가 작성한 리뷰 */
                                         <div className="mt-6 flex justify-end gap-3 border-t border-gray-50 pt-4">
                                             <button
                                                 onClick={() => handleEditClick(review)}
@@ -628,6 +666,7 @@ export default function FestivalDetailPage() {
                                             >
                                                 수정
                                             </button>
+
                                             <button
                                                 onClick={() => handleDeleteReview(review.reviewId)}
                                                 className="px-3 py-1 text-sm font-bold text-gray-400 hover:text-gray-900 transition-colors"
@@ -635,8 +674,20 @@ export default function FestivalDetailPage() {
                                                 삭제
                                             </button>
                                         </div>
+                                    ) : (
+                                        /* 다른 사람 리뷰 */
+                                        <div className="mt-6 flex justify-end gap-3 border-t border-gray-50 pt-4">
+                                            <button
+                                                onClick={() => handleReportReview(review.reviewId)}
+                                                className="px-3 py-1 text-sm font-bold text-red-500 hover:text-red-700 transition-colors"
+                                            >
+                                                신고하기
+                                            </button>
+                                        </div>
                                     )}
-                                </div>
+
+                                    </div>
+
                             );
                         })}
 
