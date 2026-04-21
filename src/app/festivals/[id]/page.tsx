@@ -656,7 +656,7 @@ export default function FestivalDetailPage() {
                                         </p>
                                     </div>
 
-                                   {/* 리뷰 하단 버튼 영역 */}
+                                    {/* 리뷰 하단 버튼 영역 */}
                                     {isMyReview ? (
                                         /* 내가 작성한 리뷰 */
                                         <div className="mt-6 flex justify-end gap-3 border-t border-gray-50 pt-4">
@@ -687,8 +687,10 @@ export default function FestivalDetailPage() {
                                     )}
 
                                     </div>
-                                    );
-                                    })}
+
+                            );
+                        })}
+
                         {!reviewLoading && !reviewError && reviewTotalPages > 1 && (
                             <div className="flex items-center justify-center gap-3 mt-8">
                                 <button
