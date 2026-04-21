@@ -1,9 +1,11 @@
 "use client";
+
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { Map, MapMarker, useKakaoLoader } from "react-kakao-maps-sdk";
 import { ACCESS_TOKEN_STORAGE_KEY } from "@/lib/jwtDisplay";
 import { useMyInfo } from "@/components/mypage/useMyInfo";
+import BookMarkButton from "@/components/BookMarkButton";
 
 type ApiRes<T> = {
     status: number | string;
@@ -26,6 +28,7 @@ type FestivalDetail = {
     homepageUrl?: string;
     mapX?: number;
     mapY?: number;
+    isBookmarked?: boolean;
 };
 
 type ReviewItem = {
@@ -139,7 +142,6 @@ export default function FestivalDetailPage() {
 
         try {
             const token = getAccessToken();
-
             const response = await fetch(
                 `/api/festivals/${festivalId}/reviews?page=${page}&size=${reviewSize}`,
                 {
@@ -200,26 +202,20 @@ export default function FestivalDetailPage() {
 
     const handleTabChange = (tab: "overview" | "location" | "review") => {
         setActiveTab(tab);
-        setIsExpanded(false); // 무조건 '접힘' 상태로 초기화!
+        setIsExpanded(false);
     };
 
     const resetReviewForm = () => {
-        setReviewForm({
-            content: "",
-            image: "",
-            rating: 5,
-        });
+        setReviewForm({ content: "", image: "", rating: 5 });
         setEditingReviewId(null);
     };
 
     const handleCreateReview = async () => {
         if (!festivalId) return;
-
         if (!isLoggedIn) {
             alert("로그인 후 리뷰를 작성할 수 있습니다.");
             return;
         }
-
         if (!reviewForm.content.trim()) {
             alert("리뷰 내용을 입력해주세요.");
             return;
@@ -227,7 +223,6 @@ export default function FestivalDetailPage() {
 
         try {
             const token = getAccessToken();
-
             const response = await fetch(`/api/festivals/${festivalId}/reviews`, {
                 method: "POST",
                 headers: {
@@ -242,10 +237,7 @@ export default function FestivalDetailPage() {
             });
 
             const result: ApiRes<ReviewCreateResponse> = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.message || "리뷰 작성에 실패했습니다.");
-            }
+            if (!response.ok) throw new Error(result.message || "리뷰 작성에 실패했습니다.");
 
             alert("리뷰 작성이 완료되었습니다.");
             resetReviewForm();
@@ -268,7 +260,6 @@ export default function FestivalDetailPage() {
 
     const handleUpdateReview = async () => {
         if (!editingReviewId) return;
-
         if (!reviewForm.content.trim()) {
             alert("리뷰 내용을 입력해주세요.");
             return;
@@ -276,7 +267,6 @@ export default function FestivalDetailPage() {
 
         try {
             const token = getAccessToken();
-
             const response = await fetch(`/api/reviews/${editingReviewId}`, {
                 method: "PATCH",
                 headers: {
@@ -291,10 +281,7 @@ export default function FestivalDetailPage() {
             });
 
             const result: ApiRes<ReviewUpdateResponse> = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.message || "리뷰 수정에 실패했습니다.");
-            }
+            if (!response.ok) throw new Error(result.message || "리뷰 수정에 실패했습니다.");
 
             alert("리뷰가 수정되었습니다.");
             resetReviewForm();
@@ -311,7 +298,6 @@ export default function FestivalDetailPage() {
 
         try {
             const token = getAccessToken();
-
             const response = await fetch(`/api/reviews/${reviewId}`, {
                 method: "DELETE",
                 headers: {
@@ -319,12 +305,8 @@ export default function FestivalDetailPage() {
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
             });
-
             const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.message || "리뷰 삭제에 실패했습니다.");
-            }
+            if (!response.ok) throw new Error(result.message || "리뷰 삭제에 실패했습니다.");
 
             alert("리뷰 삭제가 완료되었습니다.");
             fetchReviews(reviewPage);
@@ -333,85 +315,29 @@ export default function FestivalDetailPage() {
         }
     };
 
-    // 리뷰 신고하기
     const handleReportReview = async (reviewId: number) => {
-    if (!isLoggedIn) {
-        alert("로그인 후 신고할 수 있습니다.");
-        return;
-    }
-
-    const ok = confirm("이 리뷰를 신고하시겠습니까?");
-    if (!ok) return;
-
-    try {
-        const token = getAccessToken();
-
-        const response = await fetch(`/api/reviews/${reviewId}/reports`, {
-            method: "POST",
-            headers: {
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.message || "신고에 실패했습니다.");
+        if (!isLoggedIn) {
+            alert("로그인 후 신고할 수 있습니다.");
+            return;
         }
+        const ok = confirm("이 리뷰를 신고하시겠습니까?");
+        if (!ok) return;
 
-        alert("리뷰 신고가 접수되었습니다.");
-        fetchReviews(reviewPage);
-    } catch (error: any) {
-        alert(error.message || "신고 처리 중 오류가 발생했습니다.");
-    }
-};
+        try {
+            const token = getAccessToken();
+            const response = await fetch(`/api/reviews/${reviewId}/reports`, {
+                method: "POST",
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || "신고에 실패했습니다.");
 
-    // 리뷰 좋아요/좋아요 취소
-    const handleLikeReview = async (reviewId: number, isLiked: boolean) => {
-    if (!isLoggedIn) {
-        alert("로그인 후 좋아요를 누를 수 있습니다.");
-        return;
-    }
-
-    try {
-        const token = getAccessToken();
-
-        const response = await fetch(`/api/reviews/${reviewId}/like`, {
-            method: isLiked ? "DELETE" : "POST",
-            headers: {
-                "Content-Type": "application/json",
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.message || "좋아요 처리에 실패했습니다.");
+            alert("리뷰 신고가 접수되었습니다.");
+            fetchReviews(reviewPage);
+        } catch (error: any) {
+            alert(error.message || "신고 처리 중 오류가 발생했습니다.");
         }
-
-        // 1. 프론트 상태를 즉시 갱신
-        setReviews((prev) =>
-            prev.map((review) =>
-                review.reviewId === reviewId
-                    ? {
-                          ...review,
-                          liked: result.data.isLiked,
-                          likeCount: result.data.likeCount,
-                      }
-                    : review
-            )
-        );
-
-        
-
-    } catch (error: any) {
-        alert(error.message || "좋아요 처리 중 오류가 발생했습니다.");
-    }
-};
-
-
-
+    };
 
     if (!festival) return <div className="w-full h-screen flex justify-center items-center text-gray-400 font-bold">축제 정보를 불러오는 중입니다...</div>;
 
@@ -419,9 +345,24 @@ export default function FestivalDetailPage() {
 
     return (
         <div className="max-w-[1200px] mx-auto px-6 py-12 min-h-screen text-gray-900">
+            {/* 상단 요약 카드 영역 */}
+            <div className="bg-white p-8 md:p-10 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-10 mb-10 relative">
+                
+                {/* 북마크 버튼 추가 */}
+                <div className="absolute top-8 right-8 md:top-10 md:right-10 z-10">
+                    <BookMarkButton 
+                        festivalId={Number(festivalId)} 
+                        initialIsBookmarked={festival.isBookmarked || false}
+                        onToggle={(newIsBookmarked, newCount) => {
+                            setFestival((prev: any) => ({
+                                ...prev,
+                                isBookmarked: newIsBookmarked,
+                                bookMarkCount: newCount
+                            }));
+                        }}
+                    />
+                </div>
 
-            {/* 💡 2. 상단 요약 카드 영역 (시안 반영) */}
-            <div className="bg-white p-8 md:p-10 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-10 mb-10">
                 {/* 왼쪽 포스터 */}
                 <div className="w-full md:w-[280px] shrink-0 aspect-[3/4] bg-gray-50 rounded-xl overflow-hidden border border-gray-100 relative">
                     {festival.firstImageUrl ? (
@@ -470,7 +411,7 @@ export default function FestivalDetailPage() {
                 </div>
             </div>
 
-            {/* 💡 3. 탭(Tab) 메뉴 영역 */}
+            {/* 탭 메뉴 영역 */}
             <div className="flex gap-8 border-b border-gray-200 mb-8 px-2">
                 <button
                     onClick={() => handleTabChange("overview")}
@@ -492,10 +433,8 @@ export default function FestivalDetailPage() {
                 </button>
             </div>
 
-            {/* 💡 4. 탭 콘텐츠 영역 (조건부 렌더링) */}
+            {/* 탭 콘텐츠 영역 */}
             <div className="min-h-[400px]">
-
-                {/* [소개 탭] */}
                 {activeTab === "overview" && (
                     <div className="bg-white p-8 md:p-10 rounded-2xl border border-gray-100 shadow-sm relative flex flex-col">
                         <h2 className="text-sm font-bold text-gray-400 mb-6 uppercase tracking-wider">Overview</h2>
@@ -512,7 +451,6 @@ export default function FestivalDetailPage() {
                             </button>
                         )}
 
-                        {/* 홈페이지 정보는 소개 탭 하단에 배치 */}
                         {festival.homepageUrl && (
                             <div className="mt-8 pt-6 border-t border-gray-50">
                                 <p className="text-[13px] font-bold text-gray-400 mb-1 uppercase">Website</p>
@@ -524,7 +462,6 @@ export default function FestivalDetailPage() {
                     </div>
                 )}
 
-                {/* [위치 탭] */}
                 {activeTab === "location" && (
                     <div className="bg-white p-8 md:p-10 rounded-2xl border border-gray-100 shadow-sm">
                         <div className="flex justify-between items-end mb-6">
@@ -533,11 +470,7 @@ export default function FestivalDetailPage() {
                         </div>
                         <div className="w-full h-[400px] rounded-2xl overflow-hidden border border-gray-100 shadow-inner">
                             {!loadingMap && !errorMap && festival.mapY && festival.mapX ? (
-                                <Map
-                                    center={{ lat: festival.mapY, lng: festival.mapX }}
-                                    style={{ width: "100%", height: "100%" }}
-                                    level={4}
-                                >
+                                <Map center={{ lat: festival.mapY, lng: festival.mapX }} style={{ width: "100%", height: "100%" }} level={4}>
                                     <MapMarker position={{ lat: festival.mapY, lng: festival.mapX }} />
                                 </Map>
                             ) : (
@@ -547,7 +480,6 @@ export default function FestivalDetailPage() {
                     </div>
                 )}
 
-                {/* [리뷰 탭] */}
                 {activeTab === "review" && (
                     <div>
                         <div className="flex justify-between items-center mb-8">
@@ -569,206 +501,65 @@ export default function FestivalDetailPage() {
 
                         {showReviewForm && (
                             <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm mb-6">
-                                <h3 className="text-xl font-bold mb-6">
-                                    {editingReviewId ? "리뷰 수정" : "리뷰 작성"}
-                                </h3>
-
+                                <h3 className="text-xl font-bold mb-6">{editingReviewId ? "리뷰 수정" : "리뷰 작성"}</h3>
                                 <div className="space-y-5">
                                     <div>
                                         <label className="block text-sm font-bold text-gray-700 mb-2">평점</label>
                                         <select
                                             value={reviewForm.rating}
-                                            onChange={(e) =>
-                                                setReviewForm((prev) => ({
-                                                    ...prev,
-                                                    rating: Number(e.target.value),
-                                                }))
-                                            }
+                                            onChange={(e) => setReviewForm((prev) => ({ ...prev, rating: Number(e.target.value) }))}
                                             className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500"
                                         >
-                                            <option value={5}>5점</option>
-                                            <option value={4}>4점</option>
-                                            <option value={3}>3점</option>
-                                            <option value={2}>2점</option>
-                                            <option value={1}>1점</option>
+                                            {[5, 4, 3, 2, 1].map(num => <option key={num} value={num}>{num}점</option>)}
                                         </select>
                                     </div>
-
                                     <div>
                                         <label className="block text-sm font-bold text-gray-700 mb-2">리뷰 내용</label>
                                         <textarea
                                             value={reviewForm.content}
-                                            onChange={(e) =>
-                                                setReviewForm((prev) => ({
-                                                    ...prev,
-                                                    content: e.target.value,
-                                                }))
-                                            }
+                                            onChange={(e) => setReviewForm((prev) => ({ ...prev, content: e.target.value }))}
                                             rows={5}
-                                            placeholder="리뷰 내용을 입력해주세요."
                                             className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 resize-none"
                                         />
                                     </div>
-
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 mb-2">이미지 URL (선택)</label>
-                                        <input
-                                            type="text"
-                                            value={reviewForm.image}
-                                            onChange={(e) =>
-                                                setReviewForm((prev) => ({
-                                                    ...prev,
-                                                    image: e.target.value,
-                                                }))
-                                            }
-                                            placeholder="https://example.com/image.jpg"
-                                            className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500"
-                                        />
-                                    </div>
-
                                     <div className="flex gap-3 justify-end">
-                                        <button
-                                            onClick={() => {
-                                                resetReviewForm();
-                                                setShowReviewForm(false);
-                                            }}
-                                            className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-bold hover:bg-gray-50"
-                                        >
-                                            취소
-                                        </button>
-                                        <button
-                                            onClick={editingReviewId ? handleUpdateReview : handleCreateReview}
-                                            className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700"
-                                        >
-                                            {editingReviewId ? "수정 완료" : "작성 완료"}
-                                        </button>
+                                        <button onClick={() => setShowReviewForm(false)} className="px-5 py-2.5 rounded-xl border border-gray-200 font-bold">취소</button>
+                                        <button onClick={editingReviewId ? handleUpdateReview : handleCreateReview} className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-bold">완료</button>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {reviewLoading && (
-                            <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm text-gray-400 font-bold">
-                                리뷰를 불러오는 중입니다...
-                            </div>
-                        )}
-
-                        {!reviewLoading && reviewError && (
-                            <div className="bg-white rounded-2xl p-8 border border-red-100 shadow-sm text-red-500 font-bold">
-                                {reviewError}
-                            </div>
-                        )}
-
-                        {!reviewLoading && !reviewError && reviews.length === 0 && (
-                            <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm text-gray-400 font-bold">
-                                아직 등록된 리뷰가 없습니다.
-                            </div>
-                        )}
-
-                        {!reviewLoading && !reviewError && reviews.map((review) => {
-                            const isMyReview = myInfo?.memberId === review.memberId;
-
-                            return (
-                                <div key={review.reviewId} className="bg-white rounded-2xl p-8 border border-gray-100 relative hover:border-gray-200 transition-all shadow-sm mb-6">
-                                    <div className="flex items-center justify-between gap-4 mb-6">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-lg">👤</div>
-                                            <div>
-                                                <p className="font-bold text-gray-900">{review.nickname}</p>
-                                                <p className="text-yellow-500 text-sm tracking-widest">{renderStars(review.rating)}</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="text-sm text-gray-400 font-medium">
-                                            {formatReviewDate(review.createdAt)}
+                        {reviews.map((review) => (
+                            <div key={review.reviewId} className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm mb-6">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">👤</div>
+                                        <div>
+                                            <p className="font-bold">{review.nickname}</p>
+                                            <p className="text-yellow-500 text-sm">{renderStars(review.rating)}</p>
                                         </div>
                                     </div>
-
-                                    <div className="flex flex-col md:flex-row gap-6 items-start">
-                                        {review.image ? (
-                                            <img
-                                                src={review.image}
-                                                alt="리뷰 이미지"
-                                                className="w-24 h-24 rounded-xl border border-gray-100 shrink-0 object-cover shadow-inner"
-                                            />
-                                        ) : (
-                                            <div className="w-24 h-24 bg-gray-50 rounded-xl border border-gray-100 shrink-0 overflow-hidden shadow-inner flex items-center justify-center text-xs text-gray-400 font-bold">
-                                                사진 없음
-                                            </div>
-                                        )}
-                                        <p className="text-lg text-gray-600 leading-relaxed flex-grow font-medium whitespace-pre-line">
-                                            {review.content}
-                                        </p>
+                                    <div className="text-sm text-gray-400">{formatReviewDate(review.createdAt)}</div>
+                                </div>
+                                <div className="flex flex-col md:flex-row gap-6 items-start">
+                                    <div className="w-24 h-24 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-xs text-gray-400 font-bold overflow-hidden">
+                                        {review.image ? <img src={review.image} className="object-cover w-full h-full" alt="리뷰" /> : "사진 없음"}
                                     </div>
-
-                                {/* 리뷰 하단 버튼 영역 */}
-                                <div className="mt-6 flex justify-between items-center border-t border-gray-50 pt-4">
-                                    {/* 왼쪽: 좋아요 버튼 */}
-                                    <button
-                                        onClick={() => handleLikeReview(review.reviewId, review.liked)}
-                                        className={`px-3 py-1 text-sm font-bold transition-colors ${
-                                            review.liked
-                                                ? "text-blue-600 hover:text-blue-700"
-                                                : "text-gray-400 hover:text-gray-900"
-                                        }`}
-                                    >
-                                        {review.liked ? "좋아요 취소" : "좋아요"} ({review.likeCount})
-                                    </button>
-
-                                    {/* 오른쪽: 내가 쓴 리뷰면 수정/삭제, 남이 쓴 리뷰면 신고 */}
-                                    {isMyReview ? (
-                                        <div className="flex gap-3">
-                                            <button
-                                                onClick={() => handleEditClick(review)}
-                                                className="px-3 py-1 text-sm font-bold text-gray-400 hover:text-gray-900 transition-colors"
-                                            >
-                                                수정
-                                            </button>
-
-                                            <button
-                                                onClick={() => handleDeleteReview(review.reviewId)}
-                                                className="px-3 py-1 text-sm font-bold text-gray-400 hover:text-gray-900 transition-colors"
-                                            >
-                                                삭제
-                                            </button>
-                                        </div>
+                                    <p className="text-lg text-gray-600 leading-relaxed flex-grow whitespace-pre-line">{review.content}</p>
+                                </div>
+                                <div className="mt-6 flex justify-end gap-3 border-t border-gray-50 pt-4">
+                                    {myInfo?.memberId === review.memberId ? (
+                                        <>
+                                            <button onClick={() => handleEditClick(review)} className="text-sm font-bold text-gray-400 hover:text-gray-900">수정</button>
+                                            <button onClick={() => handleDeleteReview(review.reviewId)} className="text-sm font-bold text-gray-400 hover:text-gray-900">삭제</button>
+                                        </>
                                     ) : (
-                                        <div className="flex gap-3">
-                                            <button
-                                                onClick={() => handleReportReview(review.reviewId)}
-                                                className="px-3 py-1 text-sm font-bold text-red-500 hover:text-red-700 transition-colors"
-                                            >
-                                                신고하기
-                                            </button>
-                                        </div>
+                                        <button onClick={() => handleReportReview(review.reviewId)} className="text-sm font-bold text-red-500 hover:text-red-700">신고하기</button>
                                     )}
                                 </div>
-                                </div>
-
-                            );
-                        })}
-
-                        {!reviewLoading && !reviewError && reviewTotalPages > 1 && (
-                            <div className="flex items-center justify-center gap-3 mt-8">
-                                <button
-                                    disabled={reviewPage === 0}
-                                    onClick={() => fetchReviews(reviewPage - 1)}
-                                    className="px-4 py-2 rounded-xl border border-gray-200 disabled:opacity-40"
-                                >
-                                    이전
-                                </button>
-                                <span className="text-sm font-bold text-gray-600">
-                                    {reviewPage + 1} / {reviewTotalPages}
-                                </span>
-                                <button
-                                    disabled={reviewPage + 1 >= reviewTotalPages}
-                                    onClick={() => fetchReviews(reviewPage + 1)}
-                                    className="px-4 py-2 rounded-xl border border-gray-200 disabled:opacity-40"
-                                >
-                                    다음
-                                </button>
                             </div>
-                        )}
+                        ))}
                     </div>
                 )}
             </div>
