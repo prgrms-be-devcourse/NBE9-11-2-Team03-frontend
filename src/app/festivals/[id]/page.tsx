@@ -339,6 +339,47 @@ export default function FestivalDetailPage() {
         }
     };
 
+    const handleLikeReview = async (reviewId: number, isLiked: boolean) => {
+    if (!isLoggedIn) {
+        alert("로그인 후 좋아요를 누를 수 있습니다.");
+        return;
+    }
+
+    try {
+        const token = getAccessToken();
+
+        const response = await fetch(`/api/reviews/${reviewId}/like`, {
+            method: isLiked ? "DELETE" : "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || "좋아요 처리에 실패했습니다.");
+        }
+
+        setReviews((prev) =>
+            prev.map((review) =>
+                review.reviewId === reviewId
+                    ? {
+                          ...review,
+                          liked: result.data.isLiked,
+                          likeCount: result.data.likeCount,
+                      }
+                    : review
+            )
+        );
+    } catch (error: any) {
+        alert(error.message || "좋아요 처리 중 오류가 발생했습니다.");
+    }
+};
+
+
+
     if (!festival) return <div className="w-full h-screen flex justify-center items-center text-gray-400 font-bold">축제 정보를 불러오는 중입니다...</div>;
 
     const uiStatus = getStatusUI(festival.startDate, festival.endDate);
@@ -548,16 +589,46 @@ export default function FestivalDetailPage() {
                                     </div>
                                     <p className="text-lg text-gray-600 leading-relaxed flex-grow whitespace-pre-line">{review.content}</p>
                                 </div>
-                                <div className="mt-6 flex justify-end gap-3 border-t border-gray-50 pt-4">
-                                    {myInfo?.memberId === review.memberId ? (
-                                        <>
-                                            <button onClick={() => handleEditClick(review)} className="text-sm font-bold text-gray-400 hover:text-gray-900">수정</button>
-                                            <button onClick={() => handleDeleteReview(review.reviewId)} className="text-sm font-bold text-gray-400 hover:text-gray-900">삭제</button>
-                                        </>
-                                    ) : (
-                                        <button onClick={() => handleReportReview(review.reviewId)} className="text-sm font-bold text-red-500 hover:text-red-700">신고하기</button>
-                                    )}
-                                </div>
+                                <div className="mt-6 flex justify-between items-center border-t border-gray-50 pt-4">
+
+                                {/* 왼쪽: 좋아요 버튼 */}
+                                <button
+                                    onClick={() => handleLikeReview(review.reviewId, review.liked)}
+                                    className={`px-3 py-1 text-sm font-bold transition-colors ${
+                                        review.liked
+                                            ? "text-blue-600 hover:text-blue-700"
+                                            : "text-gray-400 hover:text-gray-900"
+                                    }`}
+                                >
+                                    {review.liked ? "좋아요 취소" : "좋아요"} ({review.likeCount})
+                                </button>
+
+                                {/* 오른쪽 */}
+                                {myInfo?.memberId === review.memberId ? (
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => handleEditClick(review)}
+                                            className="text-sm font-bold text-gray-400 hover:text-gray-900"
+                                        >
+                                            수정
+                                        </button>
+
+                                        <button
+                                            onClick={() => handleDeleteReview(review.reviewId)}
+                                            className="text-sm font-bold text-gray-400 hover:text-gray-900"
+                                        >
+                                            삭제
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => handleReportReview(review.reviewId)}
+                                        className="text-sm font-bold text-red-500 hover:text-red-700"
+                                    >
+                                        신고하기
+                                    </button>
+                                )}
+                            </div>
                             </div>
                         ))}
                     </div>
