@@ -98,9 +98,13 @@ export default function FestivalDetailPage() {
     const [showReviewForm, setShowReviewForm] = useState(false);
     const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
 
-    const [reviewForm, setReviewForm] = useState({
+    const [reviewForm, setReviewForm] = useState<{
+        content: string;
+        image: File | string | null;
+        rating: number;
+    }>({
         content: "",
-        image: "",
+        image: null,
         rating: 5,
     });
 
@@ -219,7 +223,7 @@ export default function FestivalDetailPage() {
             return;
         }
 
-        if (!reviewForm.content.trim()) {
+        if (!reviewForm.content || String(reviewForm.content).trim() === "") {
             alert("리뷰 내용을 입력해주세요.");
             return;
         }
@@ -227,17 +231,31 @@ export default function FestivalDetailPage() {
         try {
             const token = getAccessToken();
 
+            const formData = new FormData();
+
+            // 2. 글 내용(JSON)을 'requestDto'라는 이름으로 박스에 넣습니다.
+            const requestDto = {
+                content: reviewForm.content,
+                rating: reviewForm.rating,
+            };
+            formData.append(
+                "requestDto",
+                new Blob([JSON.stringify(requestDto)], { type: "application/json" })
+            );
+
+            // 3. 사진 파일이 있다면 'image'라는 이름으로 박스에 넣습니다.
+            if (reviewForm.image) {
+                formData.append("image", reviewForm.image);
+            }
+
+            // 4. 서버로 전송합니다.
             const response = await fetch(`/api/festivals/${festivalId}/reviews`, {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json",
+
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
-                body: JSON.stringify({
-                    content: reviewForm.content,
-                    image: reviewForm.image || null,
-                    rating: reviewForm.rating,
-                }),
+                body: formData, // 통째로 만든 formData 박스를 던집니다.
             });
 
             const result: ApiRes<ReviewCreateResponse> = await response.json();
@@ -259,8 +277,8 @@ export default function FestivalDetailPage() {
         setEditingReviewId(review.reviewId);
         setShowReviewForm(true);
         setReviewForm({
-            content: review.content,
-            image: review.image ?? "",
+            content: review.content || "",  // 내용이 혹시라도 없으면 빈 문자열 보장
+            image: review.image || null,    // ?? "" 대신 || null 로 변경
             rating: review.rating,
         });
     };
@@ -276,17 +294,31 @@ export default function FestivalDetailPage() {
         try {
             const token = getAccessToken();
 
+            // 1. FormData 객체 생성
+            const formData = new FormData();
+
+            // 2. 텍스트 데이터를 JSON 문자열로 만든 뒤, Blob으로 감싸서 추가
+            const requestDto = {
+                content: reviewForm.content,
+                rating: reviewForm.rating,
+            };
+            formData.append(
+                "requestDto",
+                new Blob([JSON.stringify(requestDto)], { type: "application/json" })
+            );
+            // 3. 사진 파일 처리 (매우 중요 ⭐)
+            if (reviewForm.image instanceof File) {
+                formData.append("image", reviewForm.image);
+            }
+
+            // 4. 서버로 전송 (메서드는 PATCH 유지)
             const response = await fetch(`/api/reviews/${editingReviewId}`, {
                 method: "PATCH",
                 headers: {
-                    "Content-Type": "application/json",
+                    // 🚨 주의: FormData를 보낼 때는 "Content-Type"을 직접 설정하지 않습니다!
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
-                body: JSON.stringify({
-                    content: reviewForm.content,
-                    image: reviewForm.image || null,
-                    rating: reviewForm.rating,
-                }),
+                body: formData, // JSON 대신 formData를 통째로 전송
             });
 
             const result: ApiRes<ReviewUpdateResponse> = await response.json();
@@ -298,7 +330,7 @@ export default function FestivalDetailPage() {
             alert("리뷰가 수정되었습니다.");
             resetReviewForm();
             setShowReviewForm(false);
-            fetchReviews(reviewPage);
+            fetchReviews(reviewPage); // 수정 후 목록 새로고침
         } catch (error: any) {
             alert(error.message || "리뷰 수정에 실패했습니다.");
         }
@@ -530,18 +562,19 @@ export default function FestivalDetailPage() {
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-bold text-gray-700 mb-2">이미지 URL (선택)</label>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">사진 첨부 (선택)</label>
                                         <input
-                                            type="text"
-                                            value={reviewForm.image}
-                                            onChange={(e) =>
+                                            type="file"
+                                            accept="image/*" // 이미지만 선택 가능하게 설정
+                                            onChange={(e) => {
+                                                // 사용자가 선택한 첫 번째 파일을 state에 저장합니다.
+                                                const file = e.target.files ? e.target.files[0] : null;
                                                 setReviewForm((prev) => ({
                                                     ...prev,
-                                                    image: e.target.value,
-                                                }))
-                                            }
-                                            placeholder="https://example.com/image.jpg"
-                                            className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500"
+                                                    image: file,
+                                                }));
+                                            }}
+                                            className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 bg-white"
                                         />
                                     </div>
 
@@ -606,7 +639,7 @@ export default function FestivalDetailPage() {
                                     <div className="flex flex-col md:flex-row gap-6 items-start">
                                         {review.image ? (
                                             <img
-                                                src={review.image}
+                                                src={`http://localhost:8080/uploads/${review.image}`} // 서버 기본 주소 추가!
                                                 alt="리뷰 이미지"
                                                 className="w-24 h-24 rounded-xl border border-gray-100 shrink-0 object-cover shadow-inner"
                                             />

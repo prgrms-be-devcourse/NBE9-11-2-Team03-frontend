@@ -228,7 +228,7 @@ export default function AdminPage() {
 
         try {
             const response = await fetch(
-                `/api/admin/festivals/sync-and-enrich?pageNo=1&numOfRows=100&eventStartDate=20260101`,
+                `/api/admin/festivals/sync-and-enrich?pageNo=1&numOfRows=500&eventStartDate=20260101`,
                 {
                     method: "POST",
                     headers: {
