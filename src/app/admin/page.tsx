@@ -223,17 +223,23 @@ export default function AdminPage() {
             return;
         }
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 600000); // 10분, 프론트 최대 대기시간
+
         try {
             const response = await fetch(
-                `http://localhost:8080/api/admin/festivals/sync-and-enrich?pageNo=1&numOfRows=200&eventStartDate=20260101`,
+                `/api/admin/festivals/sync-and-enrich?pageNo=1&numOfRows=100&eventStartDate=20260101`,
                 {
                     method: "POST",
                     headers: {
                         Authorization: `Bearer ${accessToken}`,
                         Accept: "application/json",
                     },
+                    signal: controller.signal,
                 }
             );
+
+            clearTimeout(timeoutId);
 
             const { raw, body } = await parseApiResponse(response);
 
@@ -267,6 +273,7 @@ export default function AdminPage() {
                 }
             }
         } catch (error) {
+            clearTimeout(timeoutId);
             console.error("축제 동기화 실행 오류:", error);
             setFestivalSyncResult(null);
 
@@ -275,7 +282,21 @@ export default function AdminPage() {
                 silent: true,
             });
 
-            if (latestStatus) {
+            if (error instanceof DOMException && error.name === "AbortError") {
+                if (latestStatus) {
+                    if (latestStatus.pendingCount === 0) {
+                        setFestivalActionError(
+                            "요청 시간이 초과되었지만, 현재 상세 동기화 미완료 대상은 없습니다. 동기화는 정상 반영되었을 수 있습니다."
+                        );
+                    } else {
+                        setFestivalActionError(
+                            "요청 시간이 초과되었으며, 현재 상세 동기화 일부가 미완료 상태입니다. 재처리가 필요합니다."
+                        );
+                    }
+                } else {
+                    setFestivalActionError("요청 시간이 초과되었습니다. 현재 동기화 상태를 확인해주세요.");
+                }
+            } else if (latestStatus) {
                 if (latestStatus.pendingCount === 0) {
                     setFestivalActionError(
                         "응답을 정상적으로 받지 못했지만, 현재 상세 동기화 미완료 대상은 없습니다. 동기화는 정상 반영되었을 수 있습니다."
@@ -291,6 +312,7 @@ export default function AdminPage() {
                 );
             }
         } finally {
+            clearTimeout(timeoutId);
             setFestivalActionLoading(false);
         }
     };
