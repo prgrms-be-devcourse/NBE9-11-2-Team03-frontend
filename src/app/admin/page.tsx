@@ -43,12 +43,34 @@ type ReportedReviewPageResponse = {
     totalPages: number;
 };
 
+// 축제 관련 타입 정의
+type FestivalSyncResponse = {
+    totalCount: number;
+    createdCount: number;
+    updatedCount: number;
+    failedCount: number;
+};
+
+type FestivalSyncStatusResponse = {
+    pendingCount: number;
+    pendingBreakdown: Record<string, number>;
+    needsRetry: boolean;
+};
+
 export default function AdminPage() {
     const [activeTab, setActiveTab] = useState("members");
     const [memberFilter, setMemberFilter] = useState<"all" | "reported">("all");
     const [loading, setLoading] = useState(true);
     const [memberData, setMemberData] = useState<MemberPageResponse | null>(null);
     const [reviewData, setReviewData] = useState<ReportedReviewPageResponse | null>(null);
+
+    const [festivalActionLoading, setFestivalActionLoading] = useState(false);
+    const [festivalActionMessage, setFestivalActionMessage] = useState<string | null>(null);
+    const [festivalActionError, setFestivalActionError] = useState<string | null>(null);
+    const [festivalSyncResult, setFestivalSyncResult] = useState<FestivalSyncResponse | null>(null);
+    const [festivalSyncStatus, setFestivalSyncStatus] = useState<FestivalSyncStatusResponse | null>(null);
+    const [lastFestivalAction, setLastFestivalAction] = useState<"sync" | "retry" | "status" | null>(null);
+
 
     // 1. 회원 목록 조회 API
     const fetchMembers = useCallback(async () => {
@@ -163,10 +185,258 @@ export default function AdminPage() {
         }
     };
 
+    //축제 데이터 동기화 간, 공통 안전 파싱 함수 추가
+    const parseApiResponse = async (response: Response) => {
+        const raw = await response.text();
+
+        let body: any = null;
+        let isJson = false;
+
+        try {
+            body = raw ? JSON.parse(raw) : null;
+            isJson = true;
+        } catch {
+            body = null;
+            isJson = false;
+        }
+
+        return { raw, body, isJson };
+    };
+
+
+    //축제 관리자 API 연결 함수 추가
+    const runFestivalSyncAndEnrich = async () => {
+        setFestivalActionLoading(true);
+        setFestivalActionError(null);
+        setFestivalActionMessage(null);
+
+        const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+
+        if (!accessToken) {
+            alert("로그인이 필요합니다.");
+            window.location.href = "/login";
+            return;
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 600000); // 10분, 프론트 최대 대기시간
+
+        try {
+            const response = await fetch(
+                `/api/admin/festivals/sync-and-enrich?pageNo=1&numOfRows=100&eventStartDate=20260101`,
+                {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        Accept: "application/json",
+                    },
+                    signal: controller.signal,
+                }
+            );
+
+            clearTimeout(timeoutId);
+
+            const { raw, body } = await parseApiResponse(response);
+
+            if (response.ok) {
+                setLastFestivalAction("sync");
+                setFestivalActionMessage(body?.message || "축제 목록 동기화가 완료되었습니다.");
+                setFestivalSyncResult(body?.data ?? null);
+                void fetchFestivalSyncStatus({ clearResult: false, silent: true });
+            } else {
+                setFestivalSyncResult(null);
+
+                const latestStatus = await fetchFestivalSyncStatus({
+                    clearResult: false,
+                    silent: true,
+                });
+
+                if (latestStatus) {
+                    if (latestStatus.pendingCount === 0) {
+                        setFestivalActionError(
+                            "응답을 정상적으로 받지 못했지만, 현재 상세 동기화 미완료 대상은 없습니다. 동기화는 정상 반영되었을 수 있습니다."
+                        );
+                    } else {
+                        setFestivalActionError(
+                            "응답을 정상적으로 받지 못했지만, 현재 상세 동기화 일부가 미완료 상태입니다. 재처리가 필요합니다."
+                        );
+                    }
+                } else {
+                    setFestivalActionError(
+                        body?.message || raw || "축제 동기화 실행에 실패했습니다."
+                    );
+                }
+            }
+        } catch (error) {
+            clearTimeout(timeoutId);
+            console.error("축제 동기화 실행 오류:", error);
+            setFestivalSyncResult(null);
+
+            const latestStatus = await fetchFestivalSyncStatus({
+                clearResult: false,
+                silent: true,
+            });
+
+            if (error instanceof DOMException && error.name === "AbortError") {
+                if (latestStatus) {
+                    if (latestStatus.pendingCount === 0) {
+                        setFestivalActionError(
+                            "요청 시간이 초과되었지만, 현재 상세 동기화 미완료 대상은 없습니다. 동기화는 정상 반영되었을 수 있습니다."
+                        );
+                    } else {
+                        setFestivalActionError(
+                            "요청 시간이 초과되었으며, 현재 상세 동기화 일부가 미완료 상태입니다. 재처리가 필요합니다."
+                        );
+                    }
+                } else {
+                    setFestivalActionError("요청 시간이 초과되었습니다. 현재 동기화 상태를 확인해주세요.");
+                }
+            } else if (latestStatus) {
+                if (latestStatus.pendingCount === 0) {
+                    setFestivalActionError(
+                        "응답을 정상적으로 받지 못했지만, 현재 상세 동기화 미완료 대상은 없습니다. 동기화는 정상 반영되었을 수 있습니다."
+                    );
+                } else {
+                    setFestivalActionError(
+                        "응답을 정상적으로 받지 못했지만, 현재 상세 동기화 일부가 미완료 상태입니다. 재처리가 필요합니다."
+                    );
+                }
+            } else {
+                setFestivalActionError(
+                    error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다."
+                );
+            }
+        } finally {
+            clearTimeout(timeoutId);
+            setFestivalActionLoading(false);
+        }
+    };
+
+    const runFestivalEnrichPending = async () => {
+        setFestivalActionLoading(true);
+        setFestivalActionError(null);
+        setFestivalActionMessage(null);
+
+        const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+
+        if (!accessToken) {
+            alert("로그인이 필요합니다.");
+            window.location.href = "/login";
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/festivals/enrich-pending`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    Accept: "application/json",
+                },
+            });
+
+            const { raw, body } = await parseApiResponse(response);
+
+            if (response.ok) {
+                setLastFestivalAction("retry");
+                setFestivalActionMessage(body?.message || "축제 상세 보강 재처리가 완료되었습니다.");
+                setFestivalSyncResult(body?.data ?? null);
+                void fetchFestivalSyncStatus({ clearResult: false });
+            } else {
+                setFestivalActionError(
+                    body?.message || raw || "축제 상세 재처리에 실패했습니다."
+                );
+                setFestivalSyncResult(null);
+            }
+        } catch (error) {
+            console.error("축제 상세 재처리 오류:", error);
+            setFestivalActionError(
+                error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다."
+            );
+            setFestivalSyncResult(null);
+        } finally {
+            setFestivalActionLoading(false);
+        }
+    };
+
+    const fetchFestivalSyncStatus = useCallback(
+        async (options?: { clearResult?: boolean; silent?: boolean }) => {
+            const clearResult = options?.clearResult ?? false;
+            const silent = options?.silent ?? false;
+
+            setFestivalActionLoading(true);
+
+            if (!silent) {
+                setFestivalActionError(null);
+            }
+
+            if (clearResult) {
+                setFestivalSyncResult(null);
+                setLastFestivalAction("status");
+            }
+
+            const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+
+            if (!accessToken) {
+                alert("로그인이 필요합니다.");
+                window.location.href = "/login";
+                return null;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/festivals/sync-status`, {
+                    method: "GET",
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        Accept: "application/json",
+                    },
+                });
+
+                const { raw, body } = await parseApiResponse(response);
+
+                if (response.ok) {
+                    const statusData = body?.data ?? null;
+                    setFestivalSyncStatus(statusData);
+
+                    if (!silent) {
+                        setFestivalActionMessage(body?.message || "동기화 상태 조회가 완료되었습니다.");
+                    }
+
+                    return statusData;
+                } else {
+                    if (!silent) {
+                        setFestivalActionError(
+                            body?.message || raw || "동기화 상태 조회에 실패했습니다."
+                        );
+                    }
+                    setFestivalSyncStatus(null);
+                    return null;
+                }
+            } catch (error) {
+                console.error("축제 동기화 상태 조회 오류:", error);
+
+                if (!silent) {
+                    setFestivalActionError(
+                        error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다."
+                    );
+                }
+
+                setFestivalSyncStatus(null);
+                return null;
+            } finally {
+                setFestivalActionLoading(false);
+            }
+        },
+        []
+    );
+
     useEffect(() => {
         if (activeTab === "members") void fetchMembers();
         if (activeTab === "reviews") void fetchReportedReviews();
     }, [activeTab, fetchMembers, fetchReportedReviews]);
+
+    useEffect(() => {
+        if (activeTab === "festivals") void fetchFestivalSyncStatus({ clearResult: true });
+    }, [activeTab, fetchFestivalSyncStatus]);
 
     return (
         <div className="flex min-h-screen bg-slate-50">
@@ -362,15 +632,148 @@ export default function AdminPage() {
                     </div>
                 )}
 
+                {/*축제 데이터 관리*/}
                 {activeTab === "festivals" && (
                     <div className="animate-in fade-in duration-300">
-                        <h2 className="mb-6 text-2xl font-bold text-slate-800">축제 데이터 관리</h2>
-                        <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-                            <p className="text-slate-500">이 기능은 현재 준비 중입니다.</p>
+                        <div className="mb-6 flex items-center justify-between">
+                            <h2 className="text-2xl font-bold text-slate-800">축제 데이터 관리</h2>
+                            <span className="text-sm text-slate-500">목록 데이터 동기화 및 상세 재처리 관리</span>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                                <div className="flex flex-wrap gap-3">
+                                    <button
+                                        onClick={() => void runFestivalSyncAndEnrich()}
+                                        disabled={festivalActionLoading}
+                                        className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        목록 동기화 실행
+                                    </button>
+
+                                    <button
+                                        onClick={() => void runFestivalEnrichPending()}
+                                        disabled={festivalActionLoading}
+                                        className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        상세 미완료 재처리
+                                    </button>
+
+                                    <button
+                                        onClick={() => void fetchFestivalSyncStatus({ clearResult: true })}
+                                        disabled={festivalActionLoading}
+                                        className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        동기화 상태 조회
+                                    </button>
+                                </div>
+
+                                <p className="mt-4 text-sm text-slate-500">
+                                    목록 동기화 후 변경된 축제와 기존에 미반영된 축제의 상세 보강 상태를 관리합니다.
+                                </p>
+                            </div>
+
+                            {festivalActionLoading && (
+                                <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                                    <p className="text-sm text-slate-500">요청을 처리하는 중입니다...</p>
+                                </div>
+                            )}
+
+                            {festivalActionError && (
+                                <div className="rounded-xl border border-red-200 bg-red-50 p-6 shadow-sm">
+                                    <p className="text-sm font-medium text-red-600">{festivalActionError}</p>
+                                </div>
+                            )}
+
+                            {festivalActionMessage && (
+                                <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 shadow-sm">
+                                    <p className="text-sm font-medium text-blue-700">{festivalActionMessage}</p>
+                                </div>
+                            )}
+
+                            {festivalSyncResult && lastFestivalAction !== "status" && (
+                                <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                                    <h3 className="mb-4 text-lg font-bold text-slate-800">
+                                        {lastFestivalAction === "retry"
+                                            ? "최근 상세 미완료 재처리 결과"
+                                            : "최근 목록 동기화 실행 결과"}
+                                    </h3>
+
+                                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                            <p className="text-xs font-medium text-slate-500">전체 대상</p>
+                                            <p className="mt-2 text-2xl font-bold text-slate-900">
+                                                {festivalSyncResult.totalCount}
+                                            </p>
+                                        </div>
+
+                                        <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                                            <p className="text-xs font-medium text-green-700">생성</p>
+                                            <p className="mt-2 text-2xl font-bold text-green-800">
+                                                {festivalSyncResult.createdCount}
+                                            </p>
+                                        </div>
+
+                                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                                            <p className="text-xs font-medium text-blue-700">수정</p>
+                                            <p className="mt-2 text-2xl font-bold text-blue-800">
+                                                {festivalSyncResult.updatedCount}
+                                            </p>
+                                        </div>
+
+                                        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                                            <p className="text-xs font-medium text-red-700">실패</p>
+                                            <p className="mt-2 text-2xl font-bold text-red-800">
+                                                {festivalSyncResult.failedCount}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {festivalSyncStatus && (
+                                <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                                    <div className="mb-4 flex items-center justify-between">
+                                        <h3 className="text-lg font-bold text-slate-800">현재 상세 동기화 미완료 건수</h3>
+                                        <span
+                                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                                                festivalSyncStatus.needsRetry
+                                                    ? "bg-amber-100 text-amber-700"
+                                                    : "bg-green-100 text-green-700"
+                                            }`}
+                                        >
+                            {festivalSyncStatus.needsRetry ? "재처리 필요" : "정상"}
+                        </span>
+                                    </div>
+
+                                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                            <p className="text-xs font-medium text-slate-500">전체 pending</p>
+                                            <p className="mt-2 text-2xl font-bold text-slate-900">
+                                                {festivalSyncStatus.pendingCount}
+                                            </p>
+                                        </div>
+
+                                        {Object.entries(festivalSyncStatus.pendingBreakdown).map(([key, value]) => (
+                                            <div
+                                                key={key}
+                                                className="rounded-lg border border-slate-200 bg-white p-4"
+                                            >
+                                                <p className="text-xs font-medium text-slate-500">{key}</p>
+                                                <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <p className="mt-4 text-sm text-slate-500">
+                                        해당 수치는 축제 상세 동기화 미완료 상태를 조회한 시점 기준입니다. RATE_LIMIT은 429 제한, SERVER_ERROR는 5xx 오류, EXCEPTION은 기타 예외,
+                                        UNPROCESSED는 중단 이후 미시도 대상을 의미합니다.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
-
             </main>
         </div>
     );
