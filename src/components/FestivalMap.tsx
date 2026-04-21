@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useRef } from "react"; // 💡 useRef 추가
+import { useEffect, useState, useRef } from "react";
 import { Map, MapMarker, useKakaoLoader, ZoomControl } from "react-kakao-maps-sdk";
 import { useRouter } from "next/navigation";
 
@@ -15,13 +15,13 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
     });
     
     const mapRef = useRef<kakao.maps.Map>(null);
-
-    // 서울시청 기본 좌표 (위치 못 잡을 경우 대비)
     const DEFAULT_POS = { lat: 37.5665, lng: 126.9780 };
     
     const [myPos, setMyPos] = useState(DEFAULT_POS);
     const [mapCenter, setMapCenter] = useState(DEFAULT_POS);
     const [markers, setMarkers] = useState<any[]>([]);
+
+    const [isInitialGpsLoaded, setIsInitialGpsLoaded] = useState(false);
 
     const fetchNearbyFestivals = async (lat: number, lng: number, r: number) => {
         try {
@@ -36,6 +36,7 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
         }
     };
 
+    // 1. 처음 켤 때 GPS 찾기
     useEffect(() => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
@@ -44,19 +45,27 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
                     setMyPos({ lat: latitude, lng: longitude });
                     setMapCenter({ lat: latitude, lng: longitude });
                     fetchNearbyFestivals(latitude, longitude, radiusKm);
+                    setIsInitialGpsLoaded(true); 
                 },
-                () => fetchNearbyFestivals(DEFAULT_POS.lat, DEFAULT_POS.lng, radiusKm)
+                () => {
+                    fetchNearbyFestivals(DEFAULT_POS.lat, DEFAULT_POS.lng, radiusKm);
+                    setIsInitialGpsLoaded(true); 
+                }
             );
+        } else {
+            fetchNearbyFestivals(DEFAULT_POS.lat, DEFAULT_POS.lng, radiusKm);
+            setIsInitialGpsLoaded(true);
         }
     }, []);
 
+    // 2. 슬라이더(반경) 값이 바뀔 때 실행
     useEffect(() => {
-        if (myPos.lat) {
-            fetchNearbyFestivals(myPos.lat, myPos.lng, radiusKm);
-            if (radiusKm >= 300) setMapCenter({ lat: 36.3504, lng: 127.3845 }); 
-            else setMapCenter(myPos); 
-        }
-    }, [radiusKm, myPos]); 
+        if (!isInitialGpsLoaded) return; 
+
+        fetchNearbyFestivals(myPos.lat, myPos.lng, radiusKm);
+        if (radiusKm >= 300) setMapCenter({ lat: 36.3504, lng: 127.3845 }); 
+        else setMapCenter(myPos); 
+    }, [radiusKm]); 
 
     const getZoomLevel = (r: number) => {
         if (r >= 500) return 13; 
@@ -77,7 +86,7 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
         map.panTo(moveLatLon);
     };
 
-    if (loading) return <div className="w-full h-full flex items-center justify-center bg-gray-50 text-gray-400 font-bold">지도 로딩 중...</div>;
+    if (loading || !isInitialGpsLoaded) return <div className="w-full h-full flex items-center justify-center bg-gray-50 text-gray-400 font-bold">지도 로딩 및 내 위치 찾는 중...</div>;
     if (error) return <div className="w-full h-full flex items-center justify-center bg-red-50 text-red-500 font-bold">카카오맵 로드 실패</div>;
 
     return (
@@ -87,7 +96,7 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
                 style={{ width: "100%", height: "100%" }} 
                 level={getZoomLevel(radiusKm)}
                 isPanto={true} 
-                ref={mapRef} // 💡 3. 지도 컴포넌트에 리모컨 연결
+                ref={mapRef}
             >
                 <ZoomControl position={"RIGHT_TOP"} />
                 <MapMarker position={myPos} />
@@ -109,14 +118,13 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
                 ))}
             </Map>
 
-            {/* 💡 4. 버튼 클릭 시 handlePanToMyPos 실행 */}
             <button
                 onClick={handlePanToMyPos}
                 className="absolute bottom-6 right-6 z-10 flex items-center justify-center w-12 h-12 bg-white rounded-full shadow-lg border border-gray-200 hover:bg-gray-100 transition-all active:scale-95 group"
                 title="내 위치로 이동"
             >
                 <span className="text-2xl drop-shadow-sm group-hover:text-blue-500 transition-colors">
-                    ⦿
+                    🎯
                 </span>
             </button>
         </div>

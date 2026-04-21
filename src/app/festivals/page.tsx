@@ -37,8 +37,15 @@ const RADIUS_STEPS = [5, 10, 20, 30, 50, 100, 300, 500];
 export default function MainPage() {
     const router = useRouter();
     const [viewMode, setViewMode] = useState<"list" | "map">("list");
-    const [festivals, setFestivals] = useState<any[]>([]);
 
+    useEffect(() => {
+        const savedView = sessionStorage.getItem("festivalViewMode") as "list" | "map";
+        if (savedView === "list" || savedView === "map") {
+            setViewMode(savedView);
+        }
+    }, []);
+
+    const [festivals, setFestivals] = useState<any[]>([]);
     const [currentPage, setCurrentPage] = useState(0); // API가 0부터 시작한다고 가정
     const [totalPages, setTotalPages] = useState(0);
 
@@ -50,7 +57,6 @@ export default function MainPage() {
     const [status, setStatus] = useState<"ALL" | "ONGOING" | "UPCOMING" | "ENDED">("ALL");
     const [sort, setSort] = useState("startDate,asc");
 
-    // 💡 반경 인덱스 상태 (0 ~ 7)
     const [radiusIndex, setRadiusIndex] = useState(0);
     const currentRadius = RADIUS_STEPS[radiusIndex];
 
@@ -104,13 +110,19 @@ export default function MainPage() {
             {/* 뷰 토글 영역 */}
             <div className="flex gap-0 mb-6 border border-gray-300 w-fit rounded overflow-hidden shadow-sm bg-white">
                 <button
-                    onClick={() => setViewMode("list")}
+                    onClick={() => {
+                        setViewMode("list");
+                        sessionStorage.setItem("festivalViewMode", "list"); 
+                    }}
                     className={`px-8 py-3 font-bold text-lg transition-colors ${viewMode === "list" ? "bg-gray-200 text-black" : "bg-white text-gray-500 hover:bg-gray-50"}`}
                 >
                     리스트뷰
                 </button>
                 <button
-                    onClick={() => setViewMode("map")}
+                    onClick={() => {
+                        setViewMode("map");
+                        sessionStorage.setItem("festivalViewMode", "map"); 
+                    }}
                     className={`px-8 py-3 font-bold text-lg border-l border-gray-300 transition-colors ${viewMode === "map" ? "bg-gray-200 text-black" : "bg-white text-gray-500 hover:bg-gray-50"}`}
                 >
                     지도뷰
