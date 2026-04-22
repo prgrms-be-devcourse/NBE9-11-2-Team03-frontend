@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { Map, MapMarker, useKakaoLoader } from "react-kakao-maps-sdk";
 import { ACCESS_TOKEN_STORAGE_KEY } from "@/lib/jwtDisplay";
+import { fetchWithAuth } from "@/lib/authToken";
 import { useMyInfo } from "@/components/mypage/useMyInfo";
 import BookMarkButton from "@/components/BookMarkButton";
 
@@ -126,13 +127,8 @@ export default function FestivalDetailPage() {
     useEffect(() => {
         const fetchDetail = async () => {
             try {
-                const token = typeof window !== "undefined" ? localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) : null;
-                const response = await fetch(`/api/festivals/${festivalId}`, {
+                const response = await fetchWithAuth(`/api/festivals/${festivalId}`, {
                     cache: "no-store",
-                    headers: {
-                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                        Accept: "application/json",
-                    },
                 });
                 const resData = await response.json();
                 if (
