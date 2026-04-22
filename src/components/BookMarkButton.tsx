@@ -1,6 +1,7 @@
 // src/components/BookmarkButton.tsx
 "use client";
 import { useState, useEffect } from "react";
+import { fetchWithAuth, getStoredAccessToken } from "@/lib/authToken";
 
 interface BookmarkButtonProps {
     festivalId: number;
@@ -38,20 +39,15 @@ export default function BookmarkButton({
 
         try {
 
-            const accessToken = localStorage.getItem("accessToken");
-            if (!accessToken) {
+            if (!getStoredAccessToken()) {
                 alert("로그인이 필요한 서비스입니다.");
                 setIsLoading(false);
                 return;
             }
 
             const method = isBookmarked ? "DELETE" : "POST";
-            const response = await fetch(`/api/festivals/${festivalId}/bookmark`, {
-                method: method,
-                headers: {                                              
-                    Authorization: `Bearer ${accessToken}`,                                                           
-                    Accept: "application/json",
-                },  
+            const response = await fetchWithAuth(`/api/festivals/${festivalId}/bookmark`, {
+                method,
             });
 
             if (response.status === 401 || response.status === 403) {

@@ -544,12 +544,12 @@ export default function MyPage() {
                   <span className="flex h-2 w-2 rounded-full bg-red-500"></span>
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Admin Only</span>
                 </div>
-                <a
+                <Link
                   href="/admin"
                   className="flex w-full justify-center items-center rounded-xl px-4 py-3 text-base font-semibold text-white bg-slate-800 transition-colors hover:bg-slate-900 shadow-sm"
                 >
                   관리자 대시보드
-                </a>
+                </Link>
               </div>
             )}
 
