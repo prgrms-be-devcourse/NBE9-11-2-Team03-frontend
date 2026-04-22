@@ -2,6 +2,9 @@
 
 import { ACCESS_TOKEN_STORAGE_KEY } from "@/lib/jwtDisplay";
 
+export const HOME_BACK_LOCK_KEY = "homeBackLockAfterLogin";
+export const LOGIN_BACK_LOCK_KEY = "loginBackLockAfterLogout";
+
 type TokenApiResponse = {
   status?: number | string;
   message?: string;
@@ -22,6 +25,36 @@ export function saveAccessToken(accessToken: string) {
 export function clearAccessToken() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+}
+
+export function enableHomeBackLock() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(HOME_BACK_LOCK_KEY, "true");
+}
+
+export function clearHomeBackLock() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(HOME_BACK_LOCK_KEY);
+}
+
+export function isHomeBackLockEnabled() {
+  if (typeof window === "undefined") return false;
+  return window.sessionStorage.getItem(HOME_BACK_LOCK_KEY) === "true";
+}
+
+export function enableLoginBackLock() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(LOGIN_BACK_LOCK_KEY, "true");
+}
+
+export function clearLoginBackLock() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(LOGIN_BACK_LOCK_KEY);
+}
+
+export function isLoginBackLockEnabled() {
+  if (typeof window === "undefined") return false;
+  return window.sessionStorage.getItem(LOGIN_BACK_LOCK_KEY) === "true";
 }
 
 async function reissueAccessToken() {
@@ -54,6 +87,7 @@ function withAccessToken(headers: HeadersInit | undefined, accessToken: string |
 export async function fetchWithAuth(input: RequestInfo | URL, init: RequestInit = {}) {
   const requestInit: RequestInit = {
     ...init,
+    cache: init.cache ?? "no-store",
     credentials: init.credentials ?? "include",
     headers: withAccessToken(init.headers, getStoredAccessToken()),
   };
@@ -72,6 +106,7 @@ export async function fetchWithAuth(input: RequestInfo | URL, init: RequestInit 
 
   return fetch(input, {
     ...init,
+    cache: init.cache ?? "no-store",
     credentials: init.credentials ?? "include",
     headers: withAccessToken(init.headers, newAccessToken),
   });

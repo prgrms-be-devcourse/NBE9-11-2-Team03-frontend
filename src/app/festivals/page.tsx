@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import FestivalMap from "@/components/FestivalMap";
+import { HomeBackGuard } from "@/components/HomeBackGuard";
 import { useRouter } from "next/navigation";
 import BookMarkButton from "@/components/BookMarkButton";
 import { fetchWithAuth } from "@/lib/authToken";
@@ -115,6 +116,7 @@ export default function MainPage() {
 
     return (
         <div className="max-w-[1400px] mx-auto w-full px-4 pt-8 pb-10 min-h-screen">
+            <HomeBackGuard />
 
             {/* 뷰 토글 영역 */}
             <div className="flex gap-0 mb-6 border border-gray-300 w-fit rounded overflow-hidden shadow-sm bg-white">
