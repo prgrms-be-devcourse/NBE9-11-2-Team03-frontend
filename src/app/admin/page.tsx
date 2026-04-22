@@ -506,14 +506,13 @@ export default function AdminPage() {
 
                         {/* 데이터 테이블 */}
                         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                            {/* 표 깨짐 방지: table-fixed 적용 */}
                             <table className="w-full table-fixed text-left text-sm text-slate-600">
                                 <thead className="border-b border-slate-200 bg-slate-50 text-slate-900">
                                     <tr>
-                                        {/* 각 열에 적절한 너비(w-) 할당 */}
+                                        {/* 각 열 너비 지정 (이메일 칸 너비 35%로 확장) */}
                                         <th className="w-16 px-6 py-4 font-semibold">ID</th>
-                                        <th className="px-6 py-4 font-semibold">닉네임(계정)</th>
-                                        <th className="w-1/4 px-6 py-4 font-semibold">이메일</th>
+                                        <th className="w-[20%] px-6 py-4 font-semibold">닉네임(계정)</th>
+                                        <th className="w-[35%] px-6 py-4 font-semibold">이메일</th>
                                         <th className="w-24 px-6 py-4 font-semibold">신고수</th>
                                         <th className="w-24 px-6 py-4 font-semibold">상태</th>
                                         <th className="w-32 px-6 py-4 font-semibold text-center">관리</th>
@@ -537,12 +536,15 @@ export default function AdminPage() {
                                             <tr key={member.memberId} className="hover:bg-slate-50 transition-colors">
                                                 <td className="px-6 py-4 text-slate-500 truncate">{member.memberId}</td>
                                                 <td className="px-6 py-4">
-                                                    {/* 글자가 길면 넘치지 않게 truncate 적용 */}
-                                                    <div className="font-semibold text-slate-900 truncate">{member.nickname}</div>
-                                                    <div className="text-xs text-slate-400 truncate">{member.loginId}</div>
+                                                    <div className="font-semibold text-slate-900 truncate" title={member.nickname}>{member.nickname}</div>
+                                                    <div className="text-xs text-slate-400 truncate" title={member.loginId}>{member.loginId}</div>
                                                 </td>
-                                                <td className="px-6 py-4 truncate">{member.email}</td>
-                                                {/* 숫자가 커져도 칸이 내려가지 않게 whitespace-nowrap 적용 */}
+                                                
+                                                {/* 이메일 말줄임표 제거 및 강제 줄바꿈 처리 */}
+                                                <td className="px-6 py-4 break-all" title={member.email}>
+                                                    {member.email}
+                                                </td>
+
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <span className={`font-bold ${member.reportCount >= 5 ? "text-red-600" : "text-slate-700"}`}>
                                                         {member.reportCount}회
@@ -588,7 +590,6 @@ export default function AdminPage() {
                     <div className="animate-in fade-in duration-300">
                         <h2 className="mb-6 text-2xl font-bold text-slate-800">신고 누적 리뷰 관리</h2>
                         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                            {/* 표 깨짐 방지: table-fixed 적용 */}
                             <table className="w-full table-fixed text-left text-sm text-slate-600">
                                 <thead className="border-b border-slate-200 bg-slate-50 text-slate-900">
                                     <tr>
