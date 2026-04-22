@@ -1,9 +1,11 @@
+import { HomeBackGuard } from "@/components/HomeBackGuard";
 import FestivalMap from "@/components/FestivalMap";
 import Link from "next/link"; // Next.js의 Link 컴포넌트
 
 export default function Home() {
   return (
     <main className="p-8">
+      <HomeBackGuard />
       {/* 상단 네비게이션 및 타이틀 영역 */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">전국 축제 지도</h1>

@@ -171,7 +171,8 @@ export default function MyPage() {
       clearAccessToken();
       alert("회원 탈퇴가 성공적으로 처리되었습니다. 그동안 이용해 주셔서 감사합니다.");
 
-      window.location.href = "/login";
+      // 탈퇴 후 뒤로가기로 마이페이지가 다시 안 보이게 한다.
+      window.location.replace("/login");
     } catch (err) {
       setWithdrawError(
         err instanceof Error
@@ -210,7 +211,12 @@ export default function MyPage() {
             : `내 정보 조회 실패 (${response.status})`;
 
         if (response.status === 401) {
+          // 로그아웃된 상태면 토큰을 지우고 로그인 페이지로 보낸다.
           setIsLoggedIn(false);
+          setMyInfo(null);
+          clearAccessToken();
+          window.location.replace("/login");
+          return;
         }
 
         throw new Error(message);
@@ -231,7 +237,20 @@ export default function MyPage() {
   }, []);
 
   useEffect(() => {
-    void fetchMyInfo();
+    const syncMyInfo = () => {
+      void fetchMyInfo();
+    };
+
+    // 뒤로가기나 탭 복귀 시 내 정보를 다시 불러와서 로그인 상태를 확인한다.
+    const timer = window.setTimeout(syncMyInfo, 0);
+    window.addEventListener("pageshow", syncMyInfo);
+    window.addEventListener("focus", syncMyInfo);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pageshow", syncMyInfo);
+      window.removeEventListener("focus", syncMyInfo);
+    };
   }, [fetchMyInfo]);
 
   const fetchMyReviews = useCallback(async (page: number) => {
