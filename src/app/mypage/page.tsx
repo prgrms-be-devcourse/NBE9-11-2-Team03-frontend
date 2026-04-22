@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { clearAccessToken, fetchWithAuth } from "@/lib/authToken";
+import Link from "next/link";
 
 type MyInfo = {
   memberId: number;
@@ -524,12 +525,12 @@ export default function MyPage() {
                   <span className="flex h-2 w-2 rounded-full bg-red-500"></span>
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Admin Only</span>
                 </div>
-                <a
+                <Link
                   href="/admin"
                   className="flex w-full justify-center items-center rounded-xl px-4 py-3 text-base font-semibold text-white bg-slate-800 transition-colors hover:bg-slate-900 shadow-sm"
                 >
                   관리자 대시보드
-                </a>
+                </Link>
               </div>
             )}
 
@@ -631,7 +632,7 @@ export default function MyPage() {
                   <ul className="mt-5 space-y-3">
                     {myReviews.content.map((review) => (
                       <li key={review.reviewId}>
-                        <a
+                        <Link
                           href={`/festivals/${review.festivalId}`}
                           className="block rounded-xl border border-slate-200 p-4 transition hover:border-blue-200 hover:bg-blue-50/40"
                         >
@@ -651,7 +652,7 @@ export default function MyPage() {
                           <p className="mt-3 line-clamp-2 text-sm text-slate-700">
                             {review.content}
                           </p>
-                        </a>
+                        </Link>
                       </li>
                     ))}
                   </ul>
@@ -728,7 +729,7 @@ export default function MyPage() {
                   <ul className="mt-5 space-y-3">
                     {myBookmarks.content.map((bookmark) => (
                       <li key={bookmark.bookmarkId}>
-                        <a
+                        <Link
                           href={`/festivals/${bookmark.festivalId}`}
                           className="block rounded-xl border border-slate-200 p-4 transition hover:border-blue-200 hover:bg-blue-50/40"
                         >
@@ -750,7 +751,7 @@ export default function MyPage() {
                             {new Date(bookmark.startDate).toLocaleDateString("ko-KR")} -{" "}
                             {new Date(bookmark.endDate).toLocaleDateString("ko-KR")}
                           </p>
-                        </a>
+                        </Link>
                       </li>
                     ))}
                   </ul>
