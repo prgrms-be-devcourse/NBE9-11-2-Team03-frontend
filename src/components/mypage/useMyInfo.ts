@@ -1,10 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  ACCESS_TOKEN_STORAGE_KEY,
-  REFRESH_TOKEN_STORAGE_KEY,
-} from "@/lib/jwtDisplay";
+import { fetchWithAuth } from "@/lib/authToken";
 
 type MyInfo = {
   memberId: number;
@@ -42,22 +39,11 @@ export function useMyInfo() {
     setLoading(true);
     setError(null);
 
-    const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
-    if (!accessToken) {
-      setIsLoggedIn(false);
-      setMyInfo(null);
-      setLoading(false);
-      return;
-    }
-
     setIsLoggedIn(true);
 
     try {
-      const response = await fetch(`/api/users/me`, {
+      const response = await fetchWithAuth(`/api/users/me`, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
       });
 
       const body = (await response.json().catch(() => null)) as
@@ -72,12 +58,6 @@ export function useMyInfo() {
             : `내 정보 조회 실패 (${response.status})`;
 
         if (response.status === 401) {
-          try {
-            localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
-            localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
-          } catch {
-            // ignore
-          }
           setIsLoggedIn(false);
         }
 

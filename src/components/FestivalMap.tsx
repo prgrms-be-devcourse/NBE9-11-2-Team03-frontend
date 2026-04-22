@@ -101,7 +101,7 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
                 isPanto={true}
                 ref={mapRef}
             >
-                <ZoomControl position={"RIGHT_TOP"} />
+                <ZoomControl position={"TOPRIGHT"} />
                 <MapMarker position={myPos} />
 
                 {markers.map((marker, index) => {
