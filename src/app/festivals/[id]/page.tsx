@@ -569,22 +569,57 @@ export default function FestivalDetailPage() {
                     <div>
                         <div className="flex justify-between items-center mb-8">
                             <h2 className="text-2xl font-bold tracking-tight text-gray-900">사용자 리뷰</h2>
-                            <button
-                                onClick={() => {
-                                    if (!isLoggedIn) {
-                                        alert("로그인 후 리뷰를 작성할 수 있습니다.");
-                                        return;
-                                    }
-                                    resetReviewForm();
-                                    setShowReviewForm((prev) => !prev);
-                                }}
-                                className="text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 px-6 py-2.5 rounded-xl transition-all shadow-sm active:scale-95"
-                            >
-                                {showReviewForm ? "작성 닫기" : "리뷰 작성하기"}
-                            </button>
+                            {isLoggedIn && (
+                                <button
+                                    onClick={() => {
+                                        resetReviewForm();
+                                        setShowReviewForm((prev) => !prev);
+                                    }}
+                                    className="text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 px-6 py-2.5 rounded-xl transition-all shadow-sm active:scale-95"
+                                >
+                                    {showReviewForm ? "작성 닫기" : "리뷰 작성하기"}
+                                </button>
+                            )}
                         </div>
 
-                        {showReviewForm && (
+                        {/* 비로그인: 블러 + 로그인 유도 오버레이 */}
+                        {!isLoggedIn && (
+                            <div className="relative rounded-2xl overflow-hidden">
+                                {/* 가짜 스켈레톤 리뷰 (블러 처리) */}
+                                <div className="blur-sm pointer-events-none select-none space-y-4">
+                                    {[0, 1].map((i) => (
+                                        <div key={i} className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
+                                            <div className="flex items-center gap-4 mb-6">
+                                                <div className="w-10 h-10 bg-gray-200 rounded-full shrink-0" />
+                                                <div className="flex-1 space-y-2">
+                                                    <div className="h-4 bg-gray-200 rounded w-20" />
+                                                    <div className="h-3 bg-gray-200 rounded w-14" />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <div className="h-4 bg-gray-200 rounded w-[90%]" />
+                                                <div className="h-4 bg-gray-200 rounded w-[70%]" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* 중앙 로그인 유도 오버레이 */}
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[2px]">
+                                    <div className="text-5xl mb-4">🔒</div>
+                                    <h3 className="text-xl font-bold text-gray-900 mb-2">로그인하고 리뷰 확인하기</h3>
+                                    <p className="text-gray-500 text-sm mb-6">다른 사용자들의 생생한 후기를 확인해보세요</p>
+                                    <button
+                                        onClick={() => router.push("/login")}
+                                        className="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-md active:scale-95"
+                                    >
+                                        로그인하러 가기
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {isLoggedIn && showReviewForm && (
                             <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm mb-6">
                                 <h3 className="text-xl font-bold mb-6">{editingReviewId ? "리뷰 수정" : "리뷰 작성"}</h3>
                                 <div className="space-y-5">
@@ -661,8 +696,8 @@ export default function FestivalDetailPage() {
                             </div>
                         )}
 
-                        {/* 리뷰 목록 반복 */}
-                        {reviews.map((review) => (
+                        {/* 로그인 시 리뷰 목록 */}
+                        {isLoggedIn && reviews.map((review) => (
                             <div key={review.reviewId} className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm mb-6">
                                 <div className="flex items-center justify-between mb-6">
                                     <div className="flex items-center gap-4">
@@ -734,8 +769,8 @@ export default function FestivalDetailPage() {
                             </div>
                         ))}
 
-                        {/* 글로벌 이미지 확대 모달 (리뷰 목록 바깥에 위치해야 안전함) */}
-                        {selectedImage && (
+                        {/* 글로벌 이미지 확대 모달 */}
+                        {isLoggedIn && selectedImage && (
                             <div
                                 className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4 transition-opacity"
                                 onClick={() => setSelectedImage(null)}
