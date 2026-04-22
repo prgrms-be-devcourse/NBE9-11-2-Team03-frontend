@@ -1,9 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { AuthTextField } from "@/components/auth/AuthTextField";
-import { saveAccessToken } from "@/lib/authToken";
+import {
+  clearLoginBackLock,
+  enableHomeBackLock,
+  fetchWithAuth,
+  saveAccessToken,
+} from "@/lib/authToken";
 
 type LoginResponse = {
   status?: number | string;
@@ -37,6 +42,36 @@ function getLoginError(body: LoginResponse | null): LoginErrors {
 export function LoginForm() {
   const [errors, setErrors] = useState<LoginErrors>({});
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const redirectIfAlreadyLoggedIn = async () => {
+      try {
+        // accessToken이 없어도 refreshToken 쿠키로 로그인 상태일 수 있어서 API로 확인한다.
+        const response = await fetchWithAuth("/api/users/me");
+
+        if (response.ok) {
+          window.location.replace("/festivals");
+        }
+      } catch {
+        // 로그인 페이지에서는 기존 폼을 그대로 보여준다.
+      }
+    };
+
+    const syncAuthState = () => {
+      void redirectIfAlreadyLoggedIn();
+    };
+
+    // 뒤로가기 했을 때도 로그인 상태를 다시 확인한다.
+    const timer = window.setTimeout(syncAuthState, 0);
+    window.addEventListener("pageshow", syncAuthState);
+    window.addEventListener("focus", syncAuthState);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pageshow", syncAuthState);
+      window.removeEventListener("focus", syncAuthState);
+    };
+  }, []);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -86,7 +121,10 @@ export function LoginForm() {
       }
 
       saveAccessToken(accessToken);
-      window.location.assign("/");
+      clearLoginBackLock();
+      enableHomeBackLock();
+      // 로그인 성공 후 뒤로가기로 로그인 페이지에 다시 오지 않게 replace를 사용한다.
+      window.location.replace("/festivals");
     } catch {
       setErrors({ form: "서버와 연결할 수 없습니다. 잠시 후 다시 시도해 주세요." });
     } finally {

@@ -2,8 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { clearAccessToken, fetchWithAuth } from "@/lib/authToken";
+import { useCallback, useEffect, useState } from "react";
+import {
+  clearAccessToken,
+  clearHomeBackLock,
+  enableLoginBackLock,
+  fetchWithAuth,
+  getStoredAccessToken,
+} from "@/lib/authToken";
+import { getUserDisplayName } from "@/lib/jwtDisplay";
 
 type MeResponse = {
   data?: {
@@ -12,42 +19,60 @@ type MeResponse = {
   };
 };
 
+type AuthStatus = "checking" | "loggedIn" | "loggedOut";
+
 export function SiteHeader() {
   const router = useRouter();
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
   const [displayName, setDisplayName] = useState<string | null>(null);
 
+  const loadMe = useCallback(async () => {
+    try {
+      const response = await fetchWithAuth("/api/users/me");
+      const body = (await response.json().catch(() => null)) as MeResponse | null;
+
+      if (!response.ok || !body?.data) {
+        setAuthStatus("loggedOut");
+        setDisplayName(null);
+        return;
+      }
+
+      setAuthStatus("loggedIn");
+      setDisplayName(body.data.nickname ?? body.data.email ?? "회원");
+    } catch {
+      setAuthStatus("loggedOut");
+      setDisplayName(null);
+    }
+  }, []);
+
   useEffect(() => {
-    let active = true;
+    const syncAuthState = () => {
+      // 뒤로가기 했을 때 저장된 토큰이 있는지 먼저 확인한다.
+      const accessToken = getStoredAccessToken();
 
-    const loadMe = async () => {
-      try {
-        const response = await fetchWithAuth("/api/users/me");
-        const body = (await response.json().catch(() => null)) as MeResponse | null;
-
-        if (!active) return;
-
-        if (!response.ok || !body?.data) {
-          setLoggedIn(false);
-          setDisplayName(null);
-          return;
-        }
-
-        setLoggedIn(true);
-        setDisplayName(body.data.nickname ?? body.data.email ?? "회원");
-      } catch {
-        if (!active) return;
-        setLoggedIn(false);
+      if (accessToken) {
+        setAuthStatus("loggedIn");
+        setDisplayName(getUserDisplayName(accessToken));
+      } else {
+        // accessToken이 없어도 refreshToken으로 재발급될 수 있어서 바로 로그아웃 처리하지 않는다.
+        setAuthStatus("checking");
         setDisplayName(null);
       }
+
+      void loadMe();
     };
 
-    void loadMe();
+    // 뒤로가기나 탭을 다시 열었을 때 로그인 상태를 다시 맞춘다.
+    const timer = window.setTimeout(syncAuthState, 0);
+    window.addEventListener("pageshow", syncAuthState);
+    window.addEventListener("focus", syncAuthState);
 
     return () => {
-      active = false;
+      window.clearTimeout(timer);
+      window.removeEventListener("pageshow", syncAuthState);
+      window.removeEventListener("focus", syncAuthState);
     };
-  }, []);
+  }, [loadMe]);
 
   const handleLogout = async () => {
     try {
@@ -58,13 +83,20 @@ export function SiteHeader() {
       // 화면 상태는 아래에서 정리한다.
     }
     clearAccessToken();
-    setLoggedIn(false);
+    clearHomeBackLock();
+    enableLoginBackLock();
+    setAuthStatus("loggedOut");
     setDisplayName(null);
-    router.push("/login");
+    // 로그아웃 후 뒤로가기로 이전 로그인 화면이 남지 않게 replace를 사용한다.
+    router.replace("/login");
     router.refresh();
   };
 
   const greeting = displayName ? `${displayName}님 환영합니다` : null;
+  const isChecking = authStatus === "checking";
+  const loggedIn = authStatus === "loggedIn";
+  const linkClassName =
+    "inline-flex h-10 items-center rounded-md border border-slate-300 bg-slate-100 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-200";
 
   return (
     <header className="sticky top-0 z-20 border-b border-slate-300 bg-white">
@@ -76,7 +108,25 @@ export function SiteHeader() {
           오늘의 축제
         </Link>
         <div className="flex items-center gap-2">
-          {loggedIn ? (
+          {isChecking ? (
+            // 로그인 확인 중에는 버튼을 눌러도 이동하지 못하게 막는다.
+            <>
+              <button
+                type="button"
+                disabled
+                className={`${linkClassName} cursor-not-allowed opacity-60`}
+              >
+                로그인
+              </button>
+              <button
+                type="button"
+                disabled
+                className={`${linkClassName} cursor-not-allowed opacity-60`}
+              >
+                회원가입
+              </button>
+            </>
+          ) : loggedIn ? (
             <>
               {greeting ? (
                 <span className="hidden text-sm font-medium text-slate-600 sm:inline">
@@ -85,14 +135,14 @@ export function SiteHeader() {
               ) : null}
               <Link
                 href="/mypage"
-                className="inline-flex h-10 items-center rounded-md border border-slate-300 bg-slate-100 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
+                className={linkClassName}
               >
                 마이페이지
               </Link>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="inline-flex h-10 items-center rounded-md border border-slate-300 bg-slate-100 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
+                className={linkClassName}
               >
                 로그아웃
               </button>
@@ -101,13 +151,13 @@ export function SiteHeader() {
             <>
               <Link
                 href="/login"
-                className="inline-flex h-10 items-center rounded-md border border-slate-300 bg-slate-100 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
+                className={linkClassName}
               >
                 로그인
               </Link>
               <Link
                 href="/signup"
-                className="inline-flex h-10 items-center rounded-md border border-slate-300 bg-slate-100 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
+                className={linkClassName}
               >
                 회원가입
               </Link>

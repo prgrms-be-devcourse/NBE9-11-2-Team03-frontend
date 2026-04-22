@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AuthShell } from "@/components/auth/AuthShell";
+import { LoginBackGuard } from "@/components/auth/LoginBackGuard";
 import { LoginForm } from "@/components/auth/LoginForm";
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default function LoginPage() {
       footerHref="/signup"
       footerLabel="회원가입"
     >
+      <LoginBackGuard />
       <LoginForm />
     </AuthShell>
   );
