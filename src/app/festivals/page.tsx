@@ -91,7 +91,12 @@ export default function MainPage() {
     };
 
     useEffect(() => {
+        setCurrentPage(0);
+    }, [regionCode, month, status, sort, appliedKeyword]);
+
+    useEffect(() => {
         fetchFestivals();
+        window.scrollTo({ top: 0, behavior: "smooth" });
     }, [currentPage, regionCode, month, status, sort, appliedKeyword]);
 
     const handleSearchClick = () => {
@@ -338,14 +343,17 @@ export default function MainPage() {
                             </button>
 
                             {Array.from({ length: totalPages }, (_, i) => i)
-                                .slice(Math.max(0, currentPage - 2), Math.min(totalPages, currentPage + 3))
+                                .slice(
+                                    Math.max(0, Math.min(currentPage - 2, totalPages - 5)),
+                                    Math.min(totalPages, Math.max(currentPage + 3, 5))
+                                )
                                 .map((pageNum) => (
                                     <button
                                         key={pageNum}
                                         onClick={() => setCurrentPage(pageNum)}
                                         className={`w-10 h-10 rounded-md font-bold transition-colors ${currentPage === pageNum
-                                            ? "bg-blue-600 text-white border-blue-600"
-                                            : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-100"
+                                                ? "bg-blue-600 text-white border-blue-600"
+                                                : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-100"
                                             }`}
                                     >
                                         {pageNum + 1}
