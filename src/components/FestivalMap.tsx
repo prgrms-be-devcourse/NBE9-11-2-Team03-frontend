@@ -22,6 +22,7 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
     const [mapCenter, setMapCenter] = useState(DEFAULT_POS);
     const [markers, setMarkers] = useState<any[]>([]);
     const [isInitialGpsLoaded, setIsInitialGpsLoaded] = useState(false);
+    const [hoveredMarkerId, setHoveredMarkerId] = useState<string | null>(null);
 
     // 반경(km)에 따른 지도 줌 레벨 설정
     const getZoomLevel = (r: number) => {
@@ -110,25 +111,32 @@ export default function FestivalMap({ radiusKm }: FestivalMapProps) {
 
                     if (!lat || !lng) return null;
 
+                    const markerId = `festival-${marker.id || index}`;
+                    const isHovered = hoveredMarkerId === markerId;
+
                     return (
                         <CustomOverlayMap
-                            key={`festival-${marker.id || index}`}
+                            key={markerId}
                             position={{ lat, lng }}
                             yAnchor={1}
-                            zIndex={100}
+                            zIndex={isHovered ? 200 : 100}
                         >
                             <div
                                 onClick={() => router.push(`/festivals/${marker.id}`)}
-                                className="relative group cursor-pointer"
+                                onMouseEnter={() => setHoveredMarkerId(markerId)}
+                                onMouseLeave={() => setHoveredMarkerId(null)}
+                                className="relative cursor-pointer"
                                 style={{ width: '30px', height: '45px' }}
                             >
                                 {/* 호버 시 표시되는 말풍선 */}
-                                <div className="absolute left-1/2 -translate-x-1/2 bottom-[50px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                                    <div className="bg-gray-900 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-xl whitespace-nowrap relative">
-                                        {marker.title || "축제 정보"}
-                                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45" />
+                                {isHovered && (
+                                    <div className="absolute left-1/2 -translate-x-1/2 bottom-[50px] pointer-events-none">
+                                        <div className="bg-gray-900 text-white text-sm font-bold px-4 py-2 rounded-lg shadow-xl whitespace-nowrap relative">
+                                            {marker.title || "축제 정보"}
+                                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45" />
+                                        </div>
                                     </div>
-                                </div>
+                                )}
 
                                 <img
                                     src="https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png"
