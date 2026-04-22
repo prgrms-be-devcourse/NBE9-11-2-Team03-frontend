@@ -50,7 +50,7 @@ export function LoginForm() {
         const response = await fetchWithAuth("/api/users/me");
 
         if (response.ok) {
-          window.location.replace("/");
+          window.location.replace("/festivals");
         }
       } catch {
         // 로그인 페이지에서는 기존 폼을 그대로 보여준다.
@@ -124,7 +124,7 @@ export function LoginForm() {
       clearLoginBackLock();
       enableHomeBackLock();
       // 로그인 성공 후 뒤로가기로 로그인 페이지에 다시 오지 않게 replace를 사용한다.
-      window.location.replace("/");
+      window.location.replace("/festivals");
     } catch {
       setErrors({ form: "서버와 연결할 수 없습니다. 잠시 후 다시 시도해 주세요." });
     } finally {

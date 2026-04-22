@@ -9,7 +9,7 @@ import {
 
 const HOME_HISTORY_STATE_KEY = "homeBackGuard";
 
-function pushHomeState() {
+function pushHomeState(path: string) {
   const currentState = window.history.state ?? {};
 
   if (currentState[HOME_HISTORY_STATE_KEY]) return;
@@ -20,7 +20,7 @@ function pushHomeState() {
       [HOME_HISTORY_STATE_KEY]: true,
     },
     "",
-    "/",
+    path,
   );
 }
 
@@ -28,8 +28,10 @@ export function HomeBackGuard() {
   useEffect(() => {
     if (!isHomeBackLockEnabled()) return;
 
-    // 로그인 후 홈에서는 뒤로가기를 눌러도 홈에 남게 한다.
-    pushHomeState();
+    const lockedPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+    // 로그인 후 메인에서는 뒤로가기를 눌러도 메인에 남게 한다.
+    pushHomeState(lockedPath);
 
     const checkLogin = async () => {
       const response = await fetchWithAuth("/api/users/me");
@@ -42,8 +44,8 @@ export function HomeBackGuard() {
     const handlePopState = () => {
       if (!isHomeBackLockEnabled()) return;
 
-      // 홈에서 뒤로가기가 눌리면 다시 홈 기록을 하나 넣어서 빠져나가지 않게 한다.
-      window.setTimeout(pushHomeState, 0);
+      // 메인에서 뒤로가기가 눌리면 다시 메인 기록을 하나 넣어서 빠져나가지 않게 한다.
+      window.setTimeout(() => pushHomeState(lockedPath), 0);
     };
 
     void checkLogin();
