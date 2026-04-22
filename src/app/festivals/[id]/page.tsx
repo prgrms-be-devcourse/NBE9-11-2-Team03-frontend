@@ -106,10 +106,12 @@ export default function FestivalDetailPage() {
         content: string;
         image: File | string | null;
         rating: number;
+        deleteImage: boolean;
     }>({
         content: "",
         image: null,
         rating: 5,
+        deleteImage: false,
     });
 
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -219,7 +221,7 @@ export default function FestivalDetailPage() {
     };
 
     const resetReviewForm = () => {
-        setReviewForm({ content: "", image: null, rating: 5 });
+        setReviewForm({ content: "", image: null, rating: 5, deleteImage: false });
         setEditingReviewId(null);
     };
 
@@ -279,6 +281,7 @@ export default function FestivalDetailPage() {
             content: review.content || "",
             image: review.image || null,
             rating: review.rating,
+            deleteImage: false,
         });
     };
 
@@ -296,12 +299,13 @@ export default function FestivalDetailPage() {
             const requestDto = {
                 content: reviewForm.content,
                 rating: reviewForm.rating,
+                deleteImage: reviewForm.deleteImage
             };
             formData.append(
                 "requestDto",
                 new Blob([JSON.stringify(requestDto)], { type: "application/json" })
             );
-            
+
             if (reviewForm.image instanceof File) {
                 formData.append("image", reviewForm.image);
             }
@@ -399,10 +403,10 @@ export default function FestivalDetailPage() {
                 prev.map((review) =>
                     review.reviewId === reviewId
                         ? {
-                              ...review,
-                              liked: result.data.isLiked,
-                              likeCount: result.data.likeCount,
-                          }
+                            ...review,
+                            liked: result.data.isLiked,
+                            likeCount: result.data.likeCount,
+                        }
                         : review
                 )
             );
@@ -419,11 +423,11 @@ export default function FestivalDetailPage() {
         <div className="max-w-[1200px] mx-auto px-6 py-12 min-h-screen text-gray-900">
             {/* 상단 요약 카드 영역 */}
             <div className="bg-white p-8 md:p-10 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-10 mb-10 relative">
-                
+
                 {/* 북마크 버튼 추가 */}
                 <div className="absolute top-8 right-8 md:top-10 md:right-10 z-10">
-                    <BookMarkButton 
-                        festivalId={Number(festivalId)} 
+                    <BookMarkButton
+                        festivalId={Number(festivalId)}
                         initialIsBookmarked={festival.isBookmarked || false}
                         onToggle={(newIsBookmarked, newCount) => {
                             setFestival((prev: any) => ({
@@ -598,8 +602,39 @@ export default function FestivalDetailPage() {
                                         />
                                     </div>
 
+                                    {/* 수정 전 기존 코드 위치를 찾아서 아래 코드로 통째로 변경하세요 */}
                                     <div>
                                         <label className="block text-sm font-bold text-gray-700 mb-2">사진 첨부 (선택)</label>
+
+                                        {/* 💡 추가된 부분: 이미지가 있으면 미리보기와 X 버튼 표시 */}
+                                        {reviewForm.image ? (
+                                            <div className="relative inline-block mb-3">
+                                                <img
+                                                    src={
+                                                        reviewForm.image instanceof File
+                                                            ? URL.createObjectURL(reviewForm.image) // 새로 올린 파일 미리보기
+                                                            : `http://localhost:8080/uploads/${reviewForm.image}` // 기존 서버 사진 미리보기
+                                                    }
+                                                    alt="미리보기"
+                                                    className="w-24 h-24 object-cover rounded-xl border border-gray-200"
+                                                />
+                                                {/* ❌ 삭제 버튼 */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setReviewForm(prev => ({
+                                                        ...prev,
+                                                        image: null,
+                                                        deleteImage: true // 👈 X를 누르면 이미지 비우고 삭제 플래그를 true로 변경
+                                                    }))}
+                                                    className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-md transition-colors"
+                                                    title="이미지 삭제"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        ) : null}
+
+                                        {/* 파일 입력 인풋 */}
                                         <input
                                             type="file"
                                             accept="image/*"
@@ -608,7 +643,10 @@ export default function FestivalDetailPage() {
                                                 setReviewForm((prev) => ({
                                                     ...prev,
                                                     image: file,
+                                                    deleteImage: false, // 👈 새 이미지를 선택하면 삭제 플래그는 다시 false로
                                                 }));
+                                                // 선택 후 input 값 초기화 (같은 파일 다시 선택 가능하게)
+                                                e.target.value = '';
                                             }}
                                             className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 bg-white"
                                         />
@@ -658,11 +696,10 @@ export default function FestivalDetailPage() {
                                     {/* 왼쪽: 좋아요 버튼 */}
                                     <button
                                         onClick={() => handleLikeReview(review.reviewId, review.liked)}
-                                        className={`px-3 py-1 text-sm font-bold transition-colors ${
-                                            review.liked
+                                        className={`px-3 py-1 text-sm font-bold transition-colors ${review.liked
                                                 ? "text-blue-600 hover:text-blue-700"
                                                 : "text-gray-400 hover:text-gray-900"
-                                        }`}
+                                            }`}
                                     >
                                         {review.liked ? "좋아요 취소" : "좋아요"} ({review.likeCount})
                                     </button>
