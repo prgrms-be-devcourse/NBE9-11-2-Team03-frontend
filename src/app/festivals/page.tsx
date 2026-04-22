@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import FestivalMap from "@/components/FestivalMap";
 import { useRouter } from "next/navigation";
 import BookMarkButton from "@/components/BookMarkButton";
+import { fetchWithAuth } from "@/lib/authToken";
 
 const REGIONS = [
     { code: "", name: "전체지역" },
@@ -75,13 +76,8 @@ export default function MainPage() {
             params.append("page", currentPage.toString());
             params.append("size", "12"); // 백엔드 설정에 따라 조절 가능
 
-            const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-            const response = await fetch(`/api/festivals?${params.toString()}`, {
+            const response = await fetchWithAuth(`/api/festivals?${params.toString()}`, {
                 cache: "no-store",
-                headers: {
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                    Accept: "application/json",
-                },
             });
             const resData = await response.json();
 
