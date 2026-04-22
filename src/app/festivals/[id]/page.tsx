@@ -569,19 +569,17 @@ export default function FestivalDetailPage() {
                     <div>
                         <div className="flex justify-between items-center mb-8">
                             <h2 className="text-2xl font-bold tracking-tight text-gray-900">사용자 리뷰</h2>
-                            <button
-                                onClick={() => {
-                                    if (!isLoggedIn) {
-                                        router.push("/login");
-                                        return;
-                                    }
-                                    resetReviewForm();
-                                    setShowReviewForm((prev) => !prev);
-                                }}
-                                className="text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 px-6 py-2.5 rounded-xl transition-all shadow-sm active:scale-95"
-                            >
-                                {showReviewForm ? "작성 닫기" : "리뷰 작성하기"}
-                            </button>
+                            {isLoggedIn && (
+                                <button
+                                    onClick={() => {
+                                        resetReviewForm();
+                                        setShowReviewForm((prev) => !prev);
+                                    }}
+                                    className="text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 px-6 py-2.5 rounded-xl transition-all shadow-sm active:scale-95"
+                                >
+                                    {showReviewForm ? "작성 닫기" : "리뷰 작성하기"}
+                                </button>
+                            )}
                         </div>
 
                         {/* 비로그인: 블러 + 로그인 유도 오버레이 */}
