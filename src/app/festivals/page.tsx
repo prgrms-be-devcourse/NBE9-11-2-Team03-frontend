@@ -75,7 +75,14 @@ export default function MainPage() {
             params.append("page", currentPage.toString());
             params.append("size", "12"); // 백엔드 설정에 따라 조절 가능
 
-            const response = await fetch(`/api/festivals?${params.toString()}`);
+            const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+            const response = await fetch(`/api/festivals?${params.toString()}`, {
+                cache: "no-store",
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    Accept: "application/json",
+                },
+            });
             const resData = await response.json();
 
             if (resData.resultCode === "200" || resData.status === "200") {
@@ -295,6 +302,11 @@ export default function MainPage() {
                                             initialIsBookmarked={festival.isBookmarked}
                                             isSmall={true}
                                             className="absolute top-3 right-3 z-10"
+                                            onToggle={(newStatus) => {
+                                                setFestivals(prev => prev.map(f =>
+                                                    f.id === festival.id ? { ...f, isBookmarked: newStatus } : f
+                                                ));
+                                            }}
                                         />
                                     </div>
 

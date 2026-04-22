@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ACCESS_TOKEN_STORAGE_KEY } from "@/lib/jwtDisplay";
+import { fetchWithAuth, getStoredAccessToken } from "@/lib/authToken";
 
 // --- Swagger 기반 타입 정의 ---
 type Member = {
@@ -75,23 +75,15 @@ export default function AdminPage() {
     // 1. 회원 목록 조회 API
     const fetchMembers = useCallback(async () => {
         setLoading(true);
-        const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
-
-        if (!accessToken) {
-            alert("로그인이 필요합니다.");
-            window.location.href = "/login";
-            return;
-        }
 
         try {
             const endpoint = memberFilter === "all"
                 ? "/api/admin/members"
                 : "/api/admin/members/reported";
 
-            const response = await fetch(`${endpoint}?page=0&size=10`, {
+            const response = await fetchWithAuth(`${endpoint}?page=0&size=10`, {
                 method: "GET",
                 headers: {
-                    Authorization: `Bearer ${accessToken}`,
                     "Accept": "application/json"
                 },
             });
@@ -100,6 +92,9 @@ export default function AdminPage() {
 
             if (response.ok) {
                 setMemberData(body.data);
+            } else if (response.status === 401) {
+                alert("로그인이 필요합니다.");
+                window.location.href = "/login";
             } else {
                 console.error("조회 실패:", body.message);
                 setMemberData(null);
@@ -118,14 +113,10 @@ export default function AdminPage() {
             return;
         }
 
-        const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
-        if (!accessToken) return;
-
         try {
-            const response = await fetch(`/api/admin/members/${memberId}/withdraw`, {
+            const response = await fetchWithAuth(`/api/admin/members/${memberId}/withdraw`, {
                 method: "PATCH",
                 headers: {
-                    Authorization: `Bearer ${accessToken}`,
                     "Content-Type": "application/json",
                 },
             });
@@ -135,6 +126,9 @@ export default function AdminPage() {
             if (response.ok) {
                 alert("성공적으로 탈퇴 처리되었습니다.");
                 void fetchMembers(); // 목록 새로고침
+            } else if (response.status === 401) {
+                alert("로그인이 필요합니다.");
+                window.location.href = "/login";
             } else {
                 alert(`실패: ${result.message || "알 수 없는 오류"}`);
             }
@@ -147,15 +141,15 @@ export default function AdminPage() {
     //신고된 리뷰 목록 조회 API
     const fetchReportedReviews = useCallback(async () => {
         setLoading(true);
-        const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
-        if (!accessToken) return;
 
         try {
-            const response = await fetch(`/api/admin/reviews/reported?page=0&size=10`, {
-                headers: { Authorization: `Bearer ${accessToken}` },
-            });
+            const response = await fetchWithAuth(`/api/admin/reviews/reported?page=0&size=10`);
             const body = await response.json();
             if (response.ok) setReviewData(body.data);
+            else if (response.status === 401) {
+                alert("로그인이 필요합니다.");
+                window.location.href = "/login";
+            }
         } catch (error) {
             console.error("리뷰 조회 에러:", error);
         } finally {
@@ -167,12 +161,10 @@ export default function AdminPage() {
         const actionText = action === "BLIND" ? "블라인드" : "무혐의(신고 초기화)";
         if (!confirm(`해당 리뷰를 ${actionText} 처리하시겠습니까?`)) return;
 
-        const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
         try {
-            const response = await fetch(`/api/admin/reviews/${reviewId}/status`, {
+            const response = await fetchWithAuth(`/api/admin/reviews/${reviewId}/status`, {
                 method: "PATCH",
                 headers: {
-                    Authorization: `Bearer ${accessToken}`,
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({ action }),
@@ -182,10 +174,13 @@ export default function AdminPage() {
             if (response.ok) {
                 alert(body.message || "처리가 완료되었습니다.");
                 void fetchReportedReviews(); // 처리 후 목록 새로고침
+            } else if (response.status === 401) {
+                alert("로그인이 필요합니다.");
+                window.location.href = "/login";
             } else {
                 alert(`실패: ${body.message}`);
             }
-        } catch (error) {
+        } catch {
             alert("서버 통신 중 오류가 발생했습니다.");
         }
     };
@@ -215,7 +210,7 @@ export default function AdminPage() {
         setFestivalActionError(null);
         setFestivalActionMessage(null);
 
-        const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+        const accessToken = getStoredAccessToken();
 
         if (!accessToken) {
             alert("로그인이 필요합니다.");
@@ -228,7 +223,7 @@ export default function AdminPage() {
 
         try {
             const response = await fetch(
-                `/api/admin/festivals/sync-and-enrich?pageNo=1&numOfRows=100&eventStartDate=20260101`,
+                `/api/admin/festivals/sync-and-enrich?pageNo=1&numOfRows=500&eventStartDate=20260101`,
                 {
                     method: "POST",
                     headers: {
@@ -322,7 +317,7 @@ export default function AdminPage() {
         setFestivalActionError(null);
         setFestivalActionMessage(null);
 
-        const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+        const accessToken = getStoredAccessToken();
 
         if (!accessToken) {
             alert("로그인이 필요합니다.");
@@ -379,7 +374,7 @@ export default function AdminPage() {
                 setLastFestivalAction("status");
             }
 
-            const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+            const accessToken = getStoredAccessToken();
 
             if (!accessToken) {
                 alert("로그인이 필요합니다.");
