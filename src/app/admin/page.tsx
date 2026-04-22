@@ -71,7 +71,6 @@ export default function AdminPage() {
     const [festivalSyncStatus, setFestivalSyncStatus] = useState<FestivalSyncStatusResponse | null>(null);
     const [lastFestivalAction, setLastFestivalAction] = useState<"sync" | "retry" | "status" | null>(null);
 
-
     // 1. 회원 목록 조회 API
     const fetchMembers = useCallback(async () => {
         setLoading(true);
@@ -84,7 +83,8 @@ export default function AdminPage() {
             const response = await fetchWithAuth(`${endpoint}?page=0&size=10`, {
                 method: "GET",
                 headers: {
-                    "Accept": "application/json"
+                    // 한글 깨짐 방지를 위해 charset=utf-8 명시
+                    "Accept": "application/json; charset=utf-8"
                 },
             });
 
@@ -138,12 +138,17 @@ export default function AdminPage() {
         }
     };
 
-    //신고된 리뷰 목록 조회 API
+    // 신고된 리뷰 목록 조회 API
     const fetchReportedReviews = useCallback(async () => {
         setLoading(true);
 
         try {
-            const response = await fetchWithAuth(`/api/admin/reviews/reported?page=0&size=10`);
+            const response = await fetchWithAuth(`/api/admin/reviews/reported?page=0&size=10`, {
+                headers: {
+                    // 한글 깨짐 방지를 위해 charset=utf-8 명시
+                    "Accept": "application/json; charset=utf-8"
+                }
+            });
             const body = await response.json();
             if (response.ok) setReviewData(body.data);
             else if (response.status === 401) {
@@ -156,7 +161,8 @@ export default function AdminPage() {
             setLoading(false);
         }
     }, []);
-    //리뷰 상태 변경 (BLIND / DISMISS) API
+
+    // 리뷰 상태 변경 (BLIND / DISMISS) API
     const handleReviewAction = async (reviewId: number, action: "BLIND" | "DISMISS") => {
         const actionText = action === "BLIND" ? "블라인드" : "무혐의(신고 초기화)";
         if (!confirm(`해당 리뷰를 ${actionText} 처리하시겠습니까?`)) return;
@@ -185,7 +191,7 @@ export default function AdminPage() {
         }
     };
 
-    //축제 데이터 동기화 간, 공통 안전 파싱 함수 추가
+    // 축제 데이터 동기화 간, 공통 안전 파싱 함수
     const parseApiResponse = async (response: Response) => {
         const raw = await response.text();
 
@@ -203,8 +209,7 @@ export default function AdminPage() {
         return { raw, body, isJson };
     };
 
-
-    //축제 관리자 API 연결 함수 추가
+    // 축제 관리자 API 연결 함수
     const runFestivalSyncAndEnrich = async () => {
         setFestivalActionLoading(true);
         setFestivalActionError(null);
@@ -501,15 +506,16 @@ export default function AdminPage() {
 
                         {/* 데이터 테이블 */}
                         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                            <table className="w-full text-left text-sm text-slate-600">
+                            <table className="w-full table-fixed text-left text-sm text-slate-600">
                                 <thead className="border-b border-slate-200 bg-slate-50 text-slate-900">
                                     <tr>
-                                        <th className="px-6 py-4 font-semibold">ID</th>
-                                        <th className="px-6 py-4 font-semibold">닉네임(계정)</th>
-                                        <th className="px-6 py-4 font-semibold">이메일</th>
-                                        <th className="px-6 py-4 font-semibold">신고수</th>
-                                        <th className="px-6 py-4 font-semibold">상태</th>
-                                        <th className="px-6 py-4 font-semibold text-center">관리</th>
+                                        {/* 각 열 너비 지정 (이메일 칸 너비 35%로 확장) */}
+                                        <th className="w-16 px-6 py-4 font-semibold">ID</th>
+                                        <th className="w-[20%] px-6 py-4 font-semibold">닉네임(계정)</th>
+                                        <th className="w-[35%] px-6 py-4 font-semibold">이메일</th>
+                                        <th className="w-24 px-6 py-4 font-semibold">신고수</th>
+                                        <th className="w-24 px-6 py-4 font-semibold">상태</th>
+                                        <th className="w-32 px-6 py-4 font-semibold text-center">관리</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-200">
@@ -528,24 +534,29 @@ export default function AdminPage() {
                                     ) : (
                                         memberData.content.map((member) => (
                                             <tr key={member.memberId} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-6 py-4 text-slate-500">{member.memberId}</td>
+                                                <td className="px-6 py-4 text-slate-500 truncate">{member.memberId}</td>
                                                 <td className="px-6 py-4">
-                                                    <div className="font-semibold text-slate-900">{member.nickname}</div>
-                                                    <div className="text-xs text-slate-400">{member.loginId}</div>
+                                                    <div className="font-semibold text-slate-900 truncate" title={member.nickname}>{member.nickname}</div>
+                                                    <div className="text-xs text-slate-400 truncate" title={member.loginId}>{member.loginId}</div>
                                                 </td>
-                                                <td className="px-6 py-4">{member.email}</td>
-                                                <td className="px-6 py-4">
+                                                
+                                                {/* 이메일 말줄임표 제거 및 강제 줄바꿈 처리 */}
+                                                <td className="px-6 py-4 break-all" title={member.email}>
+                                                    {member.email}
+                                                </td>
+
+                                                <td className="px-6 py-4 whitespace-nowrap">
                                                     <span className={`font-bold ${member.reportCount >= 5 ? "text-red-600" : "text-slate-700"}`}>
                                                         {member.reportCount}회
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4">
+                                                <td className="px-6 py-4 whitespace-nowrap">
                                                     <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${member.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                                                         }`}>
                                                         {member.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 text-center">
+                                                <td className="px-6 py-4 text-center whitespace-nowrap">
                                                     {member.status === "ACTIVE" ? (
                                                         <button
                                                             onClick={() => handleWithdraw(member.memberId, member.nickname)}
@@ -574,20 +585,20 @@ export default function AdminPage() {
                     </div>
                 )}
 
-                {/* 리뷰 및 축제 관리 탭 (생략 가능) */}
+                {/* 리뷰 및 축제 관리 탭 */}
                 {activeTab === "reviews" && (
                     <div className="animate-in fade-in duration-300">
                         <h2 className="mb-6 text-2xl font-bold text-slate-800">신고 누적 리뷰 관리</h2>
                         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                            <table className="w-full text-left text-sm text-slate-600">
+                            <table className="w-full table-fixed text-left text-sm text-slate-600">
                                 <thead className="border-b border-slate-200 bg-slate-50 text-slate-900">
                                     <tr>
                                         <th className="px-6 py-4 font-semibold">축제명</th>
-                                        <th className="px-6 py-4 font-semibold">작성자</th>
+                                        <th className="w-32 px-6 py-4 font-semibold">작성자</th>
                                         <th className="w-1/3 px-6 py-4 font-semibold">리뷰 내용</th>
-                                        <th className="px-6 py-4 font-semibold">신고수</th>
-                                        <th className="px-6 py-4 font-semibold">상태</th>
-                                        <th className="px-6 py-4 text-center font-semibold">관리</th>
+                                        <th className="w-24 px-6 py-4 font-semibold">신고수</th>
+                                        <th className="w-24 px-6 py-4 font-semibold">상태</th>
+                                        <th className="w-40 px-6 py-4 text-center font-semibold">관리</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-200">
@@ -597,17 +608,17 @@ export default function AdminPage() {
                                         <tr><td colSpan={6} className="px-6 py-10 text-center">신고된 리뷰가 없습니다.</td></tr>
                                     ) : reviewData.content.map((r) => (
                                         <tr key={r.reviewId} className="hover:bg-slate-50 transition-colors">
-                                            <td className="px-6 py-4 font-medium text-slate-900">{r.festivalTitle}</td>
-                                            <td className="px-6 py-4">{r.authorNickname}</td>
+                                            <td className="px-6 py-4 font-medium text-slate-900 truncate">{r.festivalTitle}</td>
+                                            <td className="px-6 py-4 truncate">{r.authorNickname}</td>
                                             <td className="px-6 py-4"><p className="line-clamp-2">{r.content}</p></td>
-                                            <td className="px-6 py-4 font-bold text-red-600">{r.reportCount}회</td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4 font-bold text-red-600 whitespace-nowrap">{r.reportCount}회</td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${r.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
                                                     {r.status}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-center">
-                                                <div className="flex justify-center gap-2">
+                                                <div className="flex justify-center gap-2 whitespace-nowrap">
                                                     {r.status === 'ACTIVE' && (
                                                         <button
                                                             onClick={() => handleReviewAction(r.reviewId, "BLIND")}
@@ -736,14 +747,13 @@ export default function AdminPage() {
                                     <div className="mb-4 flex items-center justify-between">
                                         <h3 className="text-lg font-bold text-slate-800">현재 상세 동기화 미완료 건수</h3>
                                         <span
-                                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                                                festivalSyncStatus.needsRetry
+                                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${festivalSyncStatus.needsRetry
                                                     ? "bg-amber-100 text-amber-700"
                                                     : "bg-green-100 text-green-700"
-                                            }`}
+                                                }`}
                                         >
-                            {festivalSyncStatus.needsRetry ? "재처리 필요" : "정상"}
-                        </span>
+                                            {festivalSyncStatus.needsRetry ? "재처리 필요" : "정상"}
+                                        </span>
                                     </div>
 
                                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
