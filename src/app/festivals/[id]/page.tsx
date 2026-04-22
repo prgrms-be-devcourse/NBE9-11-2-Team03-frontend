@@ -110,7 +110,14 @@ export default function FestivalDetailPage() {
     useEffect(() => {
         const fetchDetail = async () => {
             try {
-                const response = await fetch(`/api/festivals/${festivalId}`);
+                const token = typeof window !== "undefined" ? localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) : null;
+                const response = await fetch(`/api/festivals/${festivalId}`, {
+                    cache: "no-store",
+                    headers: {
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                        Accept: "application/json",
+                    },
+                });
                 const resData = await response.json();
                 if (
                     resData.status === 200 ||
