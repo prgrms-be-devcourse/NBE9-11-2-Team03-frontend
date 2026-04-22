@@ -79,6 +79,13 @@ type ReviewUpdateResponse = {
     updatedAt: string;
 };
 
+type ReviewLikeResponse = {
+    reviewId: number;
+    memberId: number;
+    liked: boolean;
+    likeCount: number;
+};
+
 export default function FestivalDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -346,6 +353,8 @@ export default function FestivalDetailPage() {
     }
 
     try {
+        console.log("클릭 직전 isLiked:", isLiked);
+
         const token = getAccessToken();
 
         const response = await fetch(`/api/reviews/${reviewId}/like`, {
@@ -356,27 +365,19 @@ export default function FestivalDetailPage() {
             },
         });
 
-        const result = await response.json();
-
+        const result: ApiRes<ReviewLikeResponse> = await response.json();
+        console.log("응답 data:", result.data);
         if (!response.ok) {
             throw new Error(result.message || "좋아요 처리에 실패했습니다.");
+            
         }
+        
 
-        setReviews((prev) =>
-            prev.map((review) =>
-                review.reviewId === reviewId
-                    ? {
-                          ...review,
-                          liked: result.data.isLiked,
-                          likeCount: result.data.likeCount,
-                      }
-                    : review
-            )
-        );
-    } catch (error: any) {
+        await fetchReviews(reviewPage);      
+         } catch (error: any) {
         alert(error.message || "좋아요 처리 중 오류가 발생했습니다.");
-    }
-};
+        }
+    };
 
 
 
