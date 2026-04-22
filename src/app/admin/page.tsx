@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { fetchWithAuth } from "@/lib/authToken";
+import { fetchWithAuth, getStoredAccessToken } from "@/lib/authToken";
 
 // --- Swagger 기반 타입 정의 ---
 type Member = {
@@ -210,7 +210,7 @@ export default function AdminPage() {
         setFestivalActionError(null);
         setFestivalActionMessage(null);
 
-        const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+        const accessToken = getStoredAccessToken();
 
         if (!accessToken) {
             alert("로그인이 필요합니다.");
@@ -317,7 +317,7 @@ export default function AdminPage() {
         setFestivalActionError(null);
         setFestivalActionMessage(null);
 
-        const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+        const accessToken = getStoredAccessToken();
 
         if (!accessToken) {
             alert("로그인이 필요합니다.");
@@ -374,7 +374,7 @@ export default function AdminPage() {
                 setLastFestivalAction("status");
             }
 
-            const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+            const accessToken = getStoredAccessToken();
 
             if (!accessToken) {
                 alert("로그인이 필요합니다.");
