@@ -394,6 +394,7 @@ export default function AdminPage() {
                 setFestivalSyncResult(null);
             } else {
                 setFestivalActionError(body?.message || raw || "축제 상태 갱신에 실패했습니다.");
+                setFestivalActionError(body?.message || raw || "축제 상태 갱신에 실패했습니다.");
             }
         } catch (error) {
             setFestivalActionError(error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다.");
@@ -626,34 +627,6 @@ export default function AdminPage() {
                                     ))}
                                 </tbody>
                             </table>
-
-                            {/* 신고 리뷰 페이지네이션 UI */}
-                            {!loading && reviewData && reviewData.totalPages > 0 && (
-                                <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-4">
-                                    <p className="text-xs text-slate-500">
-                                        총 <span className="font-semibold text-slate-700">{reviewData.totalElements}</span>개의 신고 리뷰가 있습니다.
-                                    </p>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => setReviewPage((prev) => Math.max(0, prev - 1))}
-                                            disabled={reviewPage === 0}
-                                            className="rounded border border-slate-300 bg-white px-3 py-1 text-sm text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors"
-                                        >
-                                            이전
-                                        </button>
-                                        <span className="flex items-center px-3 py-1 text-sm font-medium text-slate-700">
-                                            {reviewPage + 1} / {reviewData.totalPages}
-                                        </span>
-                                        <button
-                                            onClick={() => setReviewPage((prev) => Math.min(reviewData.totalPages - 1, prev + 1))}
-                                            disabled={reviewPage >= reviewData.totalPages - 1}
-                                            className="rounded border border-slate-300 bg-white px-3 py-1 text-sm text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors"
-                                        >
-                                            다음
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     </div>
                 )}
