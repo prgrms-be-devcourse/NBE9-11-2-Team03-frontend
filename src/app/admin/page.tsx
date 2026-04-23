@@ -577,7 +577,7 @@ export default function AdminPage() {
                                 <thead className="border-b border-slate-200 bg-slate-50 text-slate-900">
                                     <tr>
                                         <th className="w-32 px-6 py-4 font-semibold">작성자</th>
-                                        <th className="w-1/2 px-6 py-4 font-semibold">리뷰 내용</th> 
+                                        <th className="w-1/2 px-6 py-4 font-semibold">리뷰 내용</th>
                                         <th className="w-24 px-6 py-4 font-semibold">신고수</th>
                                         <th className="w-24 px-6 py-4 font-semibold">상태</th>
                                         <th className="w-40 px-6 py-4 text-center font-semibold">관리</th>
@@ -585,9 +585,9 @@ export default function AdminPage() {
                                 </thead>
                                 <tbody className="divide-y divide-slate-200">
                                     {loading ? (
-                                        <tr><td colSpan={5} className="px-6 py-10 text-center">불러오는 중...</td></tr> 
+                                        <tr><td colSpan={5} className="px-6 py-10 text-center">불러오는 중...</td></tr>
                                     ) : !reviewData || reviewData.content.length === 0 ? (
-                                        <tr><td colSpan={5} className="px-6 py-10 text-center">신고된 리뷰가 없습니다.</td></tr> 
+                                        <tr><td colSpan={5} className="px-6 py-10 text-center">신고된 리뷰가 없습니다.</td></tr>
                                     ) : reviewData.content.map((r) => (
                                         <tr key={r.reviewId} className="hover:bg-slate-50 transition-colors">
                                             <td className="px-6 py-4 truncate">{r.authorNickname}</td>
@@ -627,6 +627,33 @@ export default function AdminPage() {
                                     ))}
                                 </tbody>
                             </table>
+                            {/* 신고 리뷰 페이지네이션 UI */}
+                            {!loading && reviewData && (
+                                <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-4">
+                                    <p className="text-xs text-slate-500">
+                                        총 <span className="font-semibold text-slate-700">{reviewData.totalElements || 0}</span>개의 신고 리뷰가 있습니다.
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setReviewPage((prev) => Math.max(0, prev - 1))}
+                                            disabled={reviewPage === 0}
+                                            className="rounded border border-slate-300 bg-white px-3 py-1 text-sm text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors"
+                                        >
+                                            이전
+                                        </button>
+                                        <span className="flex items-center px-3 py-1 text-sm font-medium text-slate-700">
+                                            {reviewPage + 1} / {reviewData.totalPages || 1}
+                                        </span>
+                                        <button
+                                            onClick={() => setReviewPage((prev) => Math.min((reviewData.totalPages || 1) - 1, prev + 1))}
+                                            disabled={reviewPage >= (reviewData.totalPages || 1) - 1}
+                                            className="rounded border border-slate-300 bg-white px-3 py-1 text-sm text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors"
+                                        >
+                                            다음
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
