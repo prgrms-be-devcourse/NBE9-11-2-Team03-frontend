@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link"; // Link 컴포넌트 추가
 import { fetchWithAuth, getStoredAccessToken } from "@/lib/authToken";
 
 // --- Swagger 기반 타입 정의 ---
@@ -26,6 +27,7 @@ type MemberPageResponse = {
 // 리뷰 관련 타입 정의
 type ReportedReview = {
     reviewId: number;
+    festivalId: number;
     festivalTitle: string;
     memberId: number;
     authorNickname: string;
@@ -41,6 +43,7 @@ type ReportedReviewPageResponse = {
     size: number;
     totalElements: number;
     totalPages: number;
+
 };
 
 // 축제 관련 타입 정의
@@ -61,7 +64,7 @@ export default function AdminPage() {
     const [activeTab, setActiveTab] = useState("members");
     const [memberFilter, setMemberFilter] = useState<"all" | "reported">("all");
     const [loading, setLoading] = useState(true);
-    
+
     // 데이터 상태
     const [memberData, setMemberData] = useState<MemberPageResponse | null>(null);
     const [reviewData, setReviewData] = useState<ReportedReviewPageResponse | null>(null);
@@ -110,7 +113,7 @@ export default function AdminPage() {
         } finally {
             setLoading(false);
         }
-    }, [memberFilter, memberPage]); // memberPage 의존성 추가
+    }, [memberFilter, memberPage]);
 
     // 2. 회원 강제 탈퇴 처리 API (PATCH)
     const handleWithdraw = async (memberId: number, nickname: string) => {
@@ -165,7 +168,7 @@ export default function AdminPage() {
         } finally {
             setLoading(false);
         }
-    }, [reviewPage]); // reviewPage 의존성 추가
+    }, [reviewPage]);
 
     // 리뷰 상태 변경 (BLIND / DISMISS) API
     const handleReviewAction = async (reviewId: number, action: "BLIND" | "DISMISS") => {
@@ -196,7 +199,6 @@ export default function AdminPage() {
         }
     };
 
-    // ... (축제 동기화 관련 API 로직 동일하여 생략, 아래 그대로 둠) ...
     const parseApiResponse = async (response: Response) => {
         const raw = await response.text();
         let body: any = null;
@@ -389,8 +391,9 @@ export default function AdminPage() {
             if (response.ok) {
                 setLastFestivalAction("updateStatus");
                 setFestivalActionMessage(body?.message || "축제 상태(진행중/종료) 수동 갱신이 완료되었습니다.");
-                setFestivalSyncResult(null); 
+                setFestivalSyncResult(null);
             } else {
+                setFestivalActionError(body?.message || raw || "축제 상태 갱신에 실패했습니다.");
                 setFestivalActionError(body?.message || raw || "축제 상태 갱신에 실패했습니다.");
             }
         } catch (error) {
@@ -573,9 +576,8 @@ export default function AdminPage() {
                             <table className="w-full table-fixed text-left text-sm text-slate-600">
                                 <thead className="border-b border-slate-200 bg-slate-50 text-slate-900">
                                     <tr>
-                                        <th className="px-6 py-4 font-semibold">축제명</th>
                                         <th className="w-32 px-6 py-4 font-semibold">작성자</th>
-                                        <th className="w-1/3 px-6 py-4 font-semibold">리뷰 내용</th>
+                                        <th className="w-1/2 px-6 py-4 font-semibold">리뷰 내용</th>
                                         <th className="w-24 px-6 py-4 font-semibold">신고수</th>
                                         <th className="w-24 px-6 py-4 font-semibold">상태</th>
                                         <th className="w-40 px-6 py-4 text-center font-semibold">관리</th>
@@ -583,14 +585,20 @@ export default function AdminPage() {
                                 </thead>
                                 <tbody className="divide-y divide-slate-200">
                                     {loading ? (
-                                        <tr><td colSpan={6} className="px-6 py-10 text-center">불러오는 중...</td></tr>
+                                        <tr><td colSpan={5} className="px-6 py-10 text-center">불러오는 중...</td></tr>
                                     ) : !reviewData || reviewData.content.length === 0 ? (
-                                        <tr><td colSpan={6} className="px-6 py-10 text-center">신고된 리뷰가 없습니다.</td></tr>
+                                        <tr><td colSpan={5} className="px-6 py-10 text-center">신고된 리뷰가 없습니다.</td></tr>
                                     ) : reviewData.content.map((r) => (
                                         <tr key={r.reviewId} className="hover:bg-slate-50 transition-colors">
-                                            <td className="px-6 py-4 font-medium text-slate-900 truncate">{r.festivalTitle}</td>
                                             <td className="px-6 py-4 truncate">{r.authorNickname}</td>
-                                            <td className="px-6 py-4"><p className="line-clamp-2">{r.content}</p></td>
+                                            <td className="px-6 py-4">
+                                                <Link
+                                                    href={`/festivals/${r.festivalId}`}
+                                                    className="font-medium text-slate-700 transition hover:text-blue-600 hover:underline"
+                                                >
+                                                    <p className="line-clamp-2">{r.content}</p>
+                                                </Link>
+                                            </td>
                                             <td className="px-6 py-4 font-bold text-red-600 whitespace-nowrap">{r.reportCount}회</td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${r.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -619,12 +627,11 @@ export default function AdminPage() {
                                     ))}
                                 </tbody>
                             </table>
-                            
                             {/* 신고 리뷰 페이지네이션 UI */}
-                            {!loading && reviewData && reviewData.totalPages > 0 && (
+                            {!loading && reviewData && (
                                 <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-4">
                                     <p className="text-xs text-slate-500">
-                                        총 <span className="font-semibold text-slate-700">{reviewData.totalElements}</span>개의 신고 리뷰가 있습니다.
+                                        총 <span className="font-semibold text-slate-700">{reviewData.totalElements || 0}</span>개의 신고 리뷰가 있습니다.
                                     </p>
                                     <div className="flex gap-2">
                                         <button
@@ -635,11 +642,11 @@ export default function AdminPage() {
                                             이전
                                         </button>
                                         <span className="flex items-center px-3 py-1 text-sm font-medium text-slate-700">
-                                            {reviewPage + 1} / {reviewData.totalPages}
+                                            {reviewPage + 1} / {reviewData.totalPages || 1}
                                         </span>
                                         <button
-                                            onClick={() => setReviewPage((prev) => Math.min(reviewData.totalPages - 1, prev + 1))}
-                                            disabled={reviewPage >= reviewData.totalPages - 1}
+                                            onClick={() => setReviewPage((prev) => Math.min((reviewData.totalPages || 1) - 1, prev + 1))}
+                                            disabled={reviewPage >= (reviewData.totalPages || 1) - 1}
                                             className="rounded border border-slate-300 bg-white px-3 py-1 text-sm text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors"
                                         >
                                             다음
