@@ -61,8 +61,14 @@ export default function AdminPage() {
     const [activeTab, setActiveTab] = useState("members");
     const [memberFilter, setMemberFilter] = useState<"all" | "reported">("all");
     const [loading, setLoading] = useState(true);
+    
+    // 데이터 상태
     const [memberData, setMemberData] = useState<MemberPageResponse | null>(null);
     const [reviewData, setReviewData] = useState<ReportedReviewPageResponse | null>(null);
+
+    // 페이지네이션 상태 관리 (0부터 시작)
+    const [memberPage, setMemberPage] = useState(0);
+    const [reviewPage, setReviewPage] = useState(0);
 
     const [festivalActionLoading, setFestivalActionLoading] = useState(false);
     const [festivalActionMessage, setFestivalActionMessage] = useState<string | null>(null);
@@ -71,7 +77,7 @@ export default function AdminPage() {
     const [festivalSyncStatus, setFestivalSyncStatus] = useState<FestivalSyncStatusResponse | null>(null);
     const [lastFestivalAction, setLastFestivalAction] = useState<"sync" | "retry" | "status" | "updateStatus" | null>(null);
 
-    // 1. 회원 목록 조회 API
+    // 1. 회원 목록 조회 API (페이지네이션 적용)
     const fetchMembers = useCallback(async () => {
         setLoading(true);
 
@@ -80,10 +86,10 @@ export default function AdminPage() {
                 ? "/api/admin/members"
                 : "/api/admin/members/reported";
 
-            const response = await fetchWithAuth(`${endpoint}?page=0&size=10`, {
+            // 동적 memberPage 적용
+            const response = await fetchWithAuth(`${endpoint}?page=${memberPage}&size=10`, {
                 method: "GET",
                 headers: {
-                    // 한글 깨짐 방지를 위해 charset=utf-8 명시
                     "Accept": "application/json; charset=utf-8"
                 },
             });
@@ -104,11 +110,10 @@ export default function AdminPage() {
         } finally {
             setLoading(false);
         }
-    }, [memberFilter]);
+    }, [memberFilter, memberPage]); // memberPage 의존성 추가
 
     // 2. 회원 강제 탈퇴 처리 API (PATCH)
     const handleWithdraw = async (memberId: number, nickname: string) => {
-        // 실수 방지를 위한 확인창
         if (!confirm(`[${nickname}] 회원을 강제 탈퇴 처리하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
             return;
         }
@@ -138,14 +143,14 @@ export default function AdminPage() {
         }
     };
 
-    // 신고된 리뷰 목록 조회 API
+    // 신고된 리뷰 목록 조회 API (페이지네이션 적용)
     const fetchReportedReviews = useCallback(async () => {
         setLoading(true);
 
         try {
-            const response = await fetchWithAuth(`/api/admin/reviews/reported?page=0&size=10`, {
+            // 동적 reviewPage 적용
+            const response = await fetchWithAuth(`/api/admin/reviews/reported?page=${reviewPage}&size=10`, {
                 headers: {
-                    // 한글 깨짐 방지를 위해 charset=utf-8 명시
                     "Accept": "application/json; charset=utf-8"
                 }
             });
@@ -160,7 +165,7 @@ export default function AdminPage() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [reviewPage]); // reviewPage 의존성 추가
 
     // 리뷰 상태 변경 (BLIND / DISMISS) API
     const handleReviewAction = async (reviewId: number, action: "BLIND" | "DISMISS") => {
@@ -191,13 +196,11 @@ export default function AdminPage() {
         }
     };
 
-    // 축제 데이터 동기화 간, 공통 안전 파싱 함수
+    // ... (축제 동기화 관련 API 로직 동일하여 생략, 아래 그대로 둠) ...
     const parseApiResponse = async (response: Response) => {
         const raw = await response.text();
-
         let body: any = null;
         let isJson = false;
-
         try {
             body = raw ? JSON.parse(raw) : null;
             isJson = true;
@@ -205,30 +208,25 @@ export default function AdminPage() {
             body = null;
             isJson = false;
         }
-
         return { raw, body, isJson };
     };
 
-    // 축제 관리자 API 연결 함수
     const runFestivalSyncAndEnrich = async () => {
         setFestivalActionLoading(true);
         setFestivalActionError(null);
         setFestivalActionMessage(null);
-
         const accessToken = getStoredAccessToken();
-
         if (!accessToken) {
             alert("로그인이 필요합니다.");
             window.location.href = "/login";
             return;
         }
-
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 600000); // 10분, 프론트 최대 대기시간
+        const timeoutId = setTimeout(() => controller.abort(), 600000);
 
         try {
             const response = await fetch(
-                `/api/admin/festivals/sync-and-enrich?pageNo=1&numOfRows=500&eventStartDate=20260101`,
+                `/api/admin/festivals/sync-and-enrich?pageNo=1&numOfRows=800&eventStartDate=20260101`,
                 {
                     method: "POST",
                     headers: {
@@ -238,9 +236,7 @@ export default function AdminPage() {
                     signal: controller.signal,
                 }
             );
-
             clearTimeout(timeoutId);
-
             const { raw, body } = await parseApiResponse(response);
 
             if (response.ok) {
@@ -250,66 +246,30 @@ export default function AdminPage() {
                 void fetchFestivalSyncStatus({ clearResult: false, silent: true });
             } else {
                 setFestivalSyncResult(null);
-
-                const latestStatus = await fetchFestivalSyncStatus({
-                    clearResult: false,
-                    silent: true,
-                });
-
+                const latestStatus = await fetchFestivalSyncStatus({ clearResult: false, silent: true });
                 if (latestStatus) {
-                    if (latestStatus.pendingCount === 0) {
-                        setFestivalActionError(
-                            "응답을 정상적으로 받지 못했지만, 현재 상세 동기화 미완료 대상은 없습니다. 동기화는 정상 반영되었을 수 있습니다."
-                        );
-                    } else {
-                        setFestivalActionError(
-                            "응답을 정상적으로 받지 못했지만, 현재 상세 동기화 일부가 미완료 상태입니다. 재처리가 필요합니다."
-                        );
-                    }
+                    if (latestStatus.pendingCount === 0) setFestivalActionError("응답을 정상적으로 받지 못했지만, 현재 상세 동기화 미완료 대상은 없습니다. 동기화는 정상 반영되었을 수 있습니다.");
+                    else setFestivalActionError("응답을 정상적으로 받지 못했지만, 현재 상세 동기화 일부가 미완료 상태입니다. 재처리가 필요합니다.");
                 } else {
-                    setFestivalActionError(
-                        body?.message || raw || "축제 동기화 실행에 실패했습니다."
-                    );
+                    setFestivalActionError(body?.message || raw || "축제 동기화 실행에 실패했습니다.");
                 }
             }
         } catch (error) {
             clearTimeout(timeoutId);
-            console.error("축제 동기화 실행 오류:", error);
             setFestivalSyncResult(null);
-
-            const latestStatus = await fetchFestivalSyncStatus({
-                clearResult: false,
-                silent: true,
-            });
-
+            const latestStatus = await fetchFestivalSyncStatus({ clearResult: false, silent: true });
             if (error instanceof DOMException && error.name === "AbortError") {
                 if (latestStatus) {
-                    if (latestStatus.pendingCount === 0) {
-                        setFestivalActionError(
-                            "요청 시간이 초과되었지만, 현재 상세 동기화 미완료 대상은 없습니다. 동기화는 정상 반영되었을 수 있습니다."
-                        );
-                    } else {
-                        setFestivalActionError(
-                            "요청 시간이 초과되었으며, 현재 상세 동기화 일부가 미완료 상태입니다. 재처리가 필요합니다."
-                        );
-                    }
+                    if (latestStatus.pendingCount === 0) setFestivalActionError("요청 시간이 초과되었지만, 현재 상세 동기화 미완료 대상은 없습니다. 동기화는 정상 반영되었을 수 있습니다.");
+                    else setFestivalActionError("요청 시간이 초과되었으며, 현재 상세 동기화 일부가 미완료 상태입니다. 재처리가 필요합니다.");
                 } else {
                     setFestivalActionError("요청 시간이 초과되었습니다. 현재 동기화 상태를 확인해주세요.");
                 }
             } else if (latestStatus) {
-                if (latestStatus.pendingCount === 0) {
-                    setFestivalActionError(
-                        "응답을 정상적으로 받지 못했지만, 현재 상세 동기화 미완료 대상은 없습니다. 동기화는 정상 반영되었을 수 있습니다."
-                    );
-                } else {
-                    setFestivalActionError(
-                        "응답을 정상적으로 받지 못했지만, 현재 상세 동기화 일부가 미완료 상태입니다. 재처리가 필요합니다."
-                    );
-                }
+                if (latestStatus.pendingCount === 0) setFestivalActionError("응답을 정상적으로 받지 못했지만, 현재 상세 동기화 미완료 대상은 없습니다. 동기화는 정상 반영되었을 수 있습니다.");
+                else setFestivalActionError("응답을 정상적으로 받지 못했지만, 현재 상세 동기화 일부가 미완료 상태입니다. 재처리가 필요합니다.");
             } else {
-                setFestivalActionError(
-                    error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다."
-                );
+                setFestivalActionError(error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다.");
             }
         } finally {
             clearTimeout(timeoutId);
@@ -321,9 +281,7 @@ export default function AdminPage() {
         setFestivalActionLoading(true);
         setFestivalActionError(null);
         setFestivalActionMessage(null);
-
         const accessToken = getStoredAccessToken();
-
         if (!accessToken) {
             alert("로그인이 필요합니다.");
             window.location.href = "/login";
@@ -338,7 +296,6 @@ export default function AdminPage() {
                     Accept: "application/json",
                 },
             });
-
             const { raw, body } = await parseApiResponse(response);
 
             if (response.ok) {
@@ -347,16 +304,11 @@ export default function AdminPage() {
                 setFestivalSyncResult(body?.data ?? null);
                 void fetchFestivalSyncStatus({ clearResult: false });
             } else {
-                setFestivalActionError(
-                    body?.message || raw || "축제 상세 재처리에 실패했습니다."
-                );
+                setFestivalActionError(body?.message || raw || "축제 상세 재처리에 실패했습니다.");
                 setFestivalSyncResult(null);
             }
         } catch (error) {
-            console.error("축제 상세 재처리 오류:", error);
-            setFestivalActionError(
-                error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다."
-            );
+            setFestivalActionError(error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다.");
             setFestivalSyncResult(null);
         } finally {
             setFestivalActionLoading(false);
@@ -367,20 +319,14 @@ export default function AdminPage() {
         async (options?: { clearResult?: boolean; silent?: boolean }) => {
             const clearResult = options?.clearResult ?? false;
             const silent = options?.silent ?? false;
-
             setFestivalActionLoading(true);
-
-            if (!silent) {
-                setFestivalActionError(null);
-            }
-
+            if (!silent) setFestivalActionError(null);
             if (clearResult) {
                 setFestivalSyncResult(null);
                 setLastFestivalAction("status");
             }
 
             const accessToken = getStoredAccessToken();
-
             if (!accessToken) {
                 alert("로그인이 필요합니다.");
                 window.location.href = "/login";
@@ -395,36 +341,20 @@ export default function AdminPage() {
                         Accept: "application/json",
                     },
                 });
-
                 const { raw, body } = await parseApiResponse(response);
 
                 if (response.ok) {
                     const statusData = body?.data ?? null;
                     setFestivalSyncStatus(statusData);
-
-                    if (!silent) {
-                        setFestivalActionMessage(body?.message || "동기화 상태 조회가 완료되었습니다.");
-                    }
-
+                    if (!silent) setFestivalActionMessage(body?.message || "동기화 상태 조회가 완료되었습니다.");
                     return statusData;
                 } else {
-                    if (!silent) {
-                        setFestivalActionError(
-                            body?.message || raw || "동기화 상태 조회에 실패했습니다."
-                        );
-                    }
+                    if (!silent) setFestivalActionError(body?.message || raw || "동기화 상태 조회에 실패했습니다.");
                     setFestivalSyncStatus(null);
                     return null;
                 }
             } catch (error) {
-                console.error("축제 동기화 상태 조회 오류:", error);
-
-                if (!silent) {
-                    setFestivalActionError(
-                        error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다."
-                    );
-                }
-
+                if (!silent) setFestivalActionError(error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다.");
                 setFestivalSyncStatus(null);
                 return null;
             } finally {
@@ -435,16 +365,11 @@ export default function AdminPage() {
     );
 
     const runFestivalStatusUpdate = async () => {
-        if (!confirm("DB에 저장된 모든 축제의 상태(진행중/종료)를 오늘 날짜 기준으로 갱신하시겠습니까?")) {
-            return;
-        }
-
+        if (!confirm("DB에 저장된 모든 축제의 상태(진행중/종료)를 오늘 날짜 기준으로 갱신하시겠습니까?")) return;
         setFestivalActionLoading(true);
         setFestivalActionError(null);
         setFestivalActionMessage(null);
-
         const accessToken = getStoredAccessToken();
-
         if (!accessToken) {
             alert("로그인이 필요합니다.");
             window.location.href = "/login";
@@ -459,23 +384,17 @@ export default function AdminPage() {
                     Accept: "application/json",
                 },
             });
-
             const { raw, body } = await parseApiResponse(response);
 
             if (response.ok) {
                 setLastFestivalAction("updateStatus");
                 setFestivalActionMessage(body?.message || "축제 상태(진행중/종료) 수동 갱신이 완료되었습니다.");
-                setFestivalSyncResult(null); // 이전 동기화 결과값 초기화
+                setFestivalSyncResult(null); 
             } else {
-                setFestivalActionError(
-                    body?.message || raw || "축제 상태 갱신에 실패했습니다."
-                );
+                setFestivalActionError(body?.message || raw || "축제 상태 갱신에 실패했습니다.");
             }
         } catch (error) {
-            console.error("축제 상태 갱신 오류:", error);
-            setFestivalActionError(
-                error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다."
-            );
+            setFestivalActionError(error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다.");
         } finally {
             setFestivalActionLoading(false);
         }
@@ -492,7 +411,6 @@ export default function AdminPage() {
 
     return (
         <div className="flex min-h-screen bg-slate-50">
-
             {/* 🟢 왼쪽 사이드바 */}
             <aside className="w-64 flex-shrink-0 bg-slate-900 text-white">
                 <div className="p-6">
@@ -501,22 +419,19 @@ export default function AdminPage() {
                 <nav className="mt-6 flex flex-col gap-2 px-4">
                     <button
                         onClick={() => setActiveTab("members")}
-                        className={`rounded-lg px-4 py-3 text-left font-medium transition-colors ${activeTab === "members" ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-800"
-                            }`}
+                        className={`rounded-lg px-4 py-3 text-left font-medium transition-colors ${activeTab === "members" ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-800"}`}
                     >
                         👥 회원 관리
                     </button>
                     <button
                         onClick={() => setActiveTab("reviews")}
-                        className={`rounded-lg px-4 py-3 text-left font-medium transition-colors ${activeTab === "reviews" ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-800"
-                            }`}
+                        className={`rounded-lg px-4 py-3 text-left font-medium transition-colors ${activeTab === "reviews" ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-800"}`}
                     >
                         🚨 신고 리뷰 관리
                     </button>
                     <button
                         onClick={() => setActiveTab("festivals")}
-                        className={`rounded-lg px-4 py-3 text-left font-medium transition-colors ${activeTab === "festivals" ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-800"
-                            }`}
+                        className={`rounded-lg px-4 py-3 text-left font-medium transition-colors ${activeTab === "festivals" ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-800"}`}
                     >
                         🎉 축제 데이터 관리
                     </button>
@@ -525,7 +440,6 @@ export default function AdminPage() {
 
             {/* 🟢 오른쪽 메인 콘텐츠 */}
             <main className="flex-1 p-8 text-slate-900">
-
                 {/* 회원 관리 탭 화면 */}
                 {activeTab === "members" && (
                     <div className="animate-in fade-in duration-300">
@@ -535,16 +449,20 @@ export default function AdminPage() {
                             {/* 필터 토글 버튼 그룹 */}
                             <div className="flex flex-wrap gap-1 rounded-lg bg-slate-200 p-1">
                                 <button
-                                    onClick={() => setMemberFilter("all")}
-                                    className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${memberFilter === "all" ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-900"
-                                        }`}
+                                    onClick={() => {
+                                        setMemberFilter("all");
+                                        setMemberPage(0); // 필터 변경 시 첫 페이지로 리셋
+                                    }}
+                                    className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${memberFilter === "all" ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
                                 >
                                     전체 회원
                                 </button>
                                 <button
-                                    onClick={() => setMemberFilter("reported")}
-                                    className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${memberFilter === "reported" ? "bg-white text-red-600 shadow-sm" : "text-slate-600 hover:text-slate-900"
-                                        }`}
+                                    onClick={() => {
+                                        setMemberFilter("reported");
+                                        setMemberPage(0); // 필터 변경 시 첫 페이지로 리셋
+                                    }}
+                                    className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${memberFilter === "reported" ? "bg-white text-red-600 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
                                 >
                                     ⚠️ 신고 누적(5회↑)
                                 </button>
@@ -556,7 +474,6 @@ export default function AdminPage() {
                             <table className="w-full table-fixed text-left text-sm text-slate-600">
                                 <thead className="border-b border-slate-200 bg-slate-50 text-slate-900">
                                     <tr>
-                                        {/* 각 열 너비 지정 (이메일 칸 너비 35%로 확장) */}
                                         <th className="w-16 px-6 py-4 font-semibold">ID</th>
                                         <th className="w-[20%] px-6 py-4 font-semibold">닉네임(계정)</th>
                                         <th className="w-[35%] px-6 py-4 font-semibold">이메일</th>
@@ -586,20 +503,16 @@ export default function AdminPage() {
                                                     <div className="font-semibold text-slate-900 truncate" title={member.nickname}>{member.nickname}</div>
                                                     <div className="text-xs text-slate-400 truncate" title={member.loginId}>{member.loginId}</div>
                                                 </td>
-
-                                                {/* 이메일 말줄임표 제거 및 강제 줄바꿈 처리 */}
                                                 <td className="px-6 py-4 break-all" title={member.email}>
                                                     {member.email}
                                                 </td>
-
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <span className={`font-bold ${member.reportCount >= 5 ? "text-red-600" : "text-slate-700"}`}>
                                                         {member.reportCount}회
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
-                                                    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${member.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                                        }`}>
+                                                    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${member.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                                         {member.status}
                                                     </span>
                                                 </td>
@@ -621,18 +534,38 @@ export default function AdminPage() {
                                 </tbody>
                             </table>
 
-                            {!loading && memberData && (
-                                <div className="border-t border-slate-200 bg-slate-50 px-6 py-4">
+                            {/* 회원 페이지네이션 UI */}
+                            {!loading && memberData && memberData.totalPages > 0 && (
+                                <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-4">
                                     <p className="text-xs text-slate-500">
                                         총 <span className="font-semibold text-slate-700">{memberData.totalElements}</span>명의 회원이 있습니다.
                                     </p>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setMemberPage((prev) => Math.max(0, prev - 1))}
+                                            disabled={memberPage === 0}
+                                            className="rounded border border-slate-300 bg-white px-3 py-1 text-sm text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors"
+                                        >
+                                            이전
+                                        </button>
+                                        <span className="flex items-center px-3 py-1 text-sm font-medium text-slate-700">
+                                            {memberPage + 1} / {memberData.totalPages}
+                                        </span>
+                                        <button
+                                            onClick={() => setMemberPage((prev) => Math.min(memberData.totalPages - 1, prev + 1))}
+                                            disabled={memberPage >= memberData.totalPages - 1}
+                                            className="rounded border border-slate-300 bg-white px-3 py-1 text-sm text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors"
+                                        >
+                                            다음
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>
                     </div>
                 )}
 
-                {/* 리뷰 및 축제 관리 탭 */}
+                {/* 리뷰 관리 탭 화면 */}
                 {activeTab === "reviews" && (
                     <div className="animate-in fade-in duration-300">
                         <h2 className="mb-6 text-2xl font-bold text-slate-800">신고 누적 리뷰 관리</h2>
@@ -686,11 +619,39 @@ export default function AdminPage() {
                                     ))}
                                 </tbody>
                             </table>
+                            
+                            {/* 신고 리뷰 페이지네이션 UI */}
+                            {!loading && reviewData && reviewData.totalPages > 0 && (
+                                <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-4">
+                                    <p className="text-xs text-slate-500">
+                                        총 <span className="font-semibold text-slate-700">{reviewData.totalElements}</span>개의 신고 리뷰가 있습니다.
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setReviewPage((prev) => Math.max(0, prev - 1))}
+                                            disabled={reviewPage === 0}
+                                            className="rounded border border-slate-300 bg-white px-3 py-1 text-sm text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors"
+                                        >
+                                            이전
+                                        </button>
+                                        <span className="flex items-center px-3 py-1 text-sm font-medium text-slate-700">
+                                            {reviewPage + 1} / {reviewData.totalPages}
+                                        </span>
+                                        <button
+                                            onClick={() => setReviewPage((prev) => Math.min(reviewData.totalPages - 1, prev + 1))}
+                                            disabled={reviewPage >= reviewData.totalPages - 1}
+                                            className="rounded border border-slate-300 bg-white px-3 py-1 text-sm text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors"
+                                        >
+                                            다음
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
 
-                {/*축제 데이터 관리*/}
+                {/* 축제 데이터 관리 (변경사항 없음) */}
                 {activeTab === "festivals" && (
                     <div className="animate-in fade-in duration-300">
                         <div className="mb-6 flex items-center justify-between">
@@ -723,8 +684,6 @@ export default function AdminPage() {
                                     >
                                         ⏳ 축제 상태 새로고침
                                     </button>
-                                
-
                                     <button
                                         onClick={() => void fetchFestivalSyncStatus({ clearResult: true })}
                                         disabled={festivalActionLoading}
@@ -733,7 +692,6 @@ export default function AdminPage() {
                                         동기화 상태 조회
                                     </button>
                                 </div>
-
                                 <p className="mt-4 text-sm text-slate-500">
                                     목록 동기화 후 변경된 축제와 기존에 미반영된 축제의 상세 보강 상태를 관리합니다.
                                 </p>
@@ -764,7 +722,6 @@ export default function AdminPage() {
                                             ? "최근 상세 미완료 재처리 결과"
                                             : "최근 목록 동기화 실행 결과"}
                                     </h3>
-
                                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                                         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                                             <p className="text-xs font-medium text-slate-500">전체 대상</p>
@@ -772,21 +729,18 @@ export default function AdminPage() {
                                                 {festivalSyncResult.totalCount}
                                             </p>
                                         </div>
-
                                         <div className="rounded-lg border border-green-200 bg-green-50 p-4">
                                             <p className="text-xs font-medium text-green-700">생성</p>
                                             <p className="mt-2 text-2xl font-bold text-green-800">
                                                 {festivalSyncResult.createdCount}
                                             </p>
                                         </div>
-
                                         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
                                             <p className="text-xs font-medium text-blue-700">수정</p>
                                             <p className="mt-2 text-2xl font-bold text-blue-800">
                                                 {festivalSyncResult.updatedCount}
                                             </p>
                                         </div>
-
                                         <div className="rounded-lg border border-red-200 bg-red-50 p-4">
                                             <p className="text-xs font-medium text-red-700">실패</p>
                                             <p className="mt-2 text-2xl font-bold text-red-800">
@@ -810,7 +764,6 @@ export default function AdminPage() {
                                             {festivalSyncStatus.needsRetry ? "재처리 필요" : "정상"}
                                         </span>
                                     </div>
-
                                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                                         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                                             <p className="text-xs font-medium text-slate-500">전체 pending</p>
@@ -818,7 +771,6 @@ export default function AdminPage() {
                                                 {festivalSyncStatus.pendingCount}
                                             </p>
                                         </div>
-
                                         {Object.entries(festivalSyncStatus.pendingBreakdown).map(([key, value]) => (
                                             <div
                                                 key={key}
@@ -829,7 +781,6 @@ export default function AdminPage() {
                                             </div>
                                         ))}
                                     </div>
-
                                     <p className="mt-4 text-sm text-slate-500">
                                         해당 수치는 축제 상세 동기화 미완료 상태를 조회한 시점 기준입니다. RATE_LIMIT은 429 제한, SERVER_ERROR는 5xx 오류, EXCEPTION은 기타 예외,
                                         UNPROCESSED는 중단 이후 미시도 대상을 의미합니다.
