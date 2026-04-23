@@ -69,7 +69,7 @@ export default function AdminPage() {
     const [festivalActionError, setFestivalActionError] = useState<string | null>(null);
     const [festivalSyncResult, setFestivalSyncResult] = useState<FestivalSyncResponse | null>(null);
     const [festivalSyncStatus, setFestivalSyncStatus] = useState<FestivalSyncStatusResponse | null>(null);
-    const [lastFestivalAction, setLastFestivalAction] = useState<"sync" | "retry" | "status" | null>(null);
+    const [lastFestivalAction, setLastFestivalAction] = useState<"sync" | "retry" | "status" | "updateStatus" | null>(null);
 
     // 1. 회원 목록 조회 API
     const fetchMembers = useCallback(async () => {
@@ -434,6 +434,53 @@ export default function AdminPage() {
         []
     );
 
+    const runFestivalStatusUpdate = async () => {
+        if (!confirm("DB에 저장된 모든 축제의 상태(진행중/종료)를 오늘 날짜 기준으로 갱신하시겠습니까?")) {
+            return;
+        }
+
+        setFestivalActionLoading(true);
+        setFestivalActionError(null);
+        setFestivalActionMessage(null);
+
+        const accessToken = getStoredAccessToken();
+
+        if (!accessToken) {
+            alert("로그인이 필요합니다.");
+            window.location.href = "/login";
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/festivals/update-status`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    Accept: "application/json",
+                },
+            });
+
+            const { raw, body } = await parseApiResponse(response);
+
+            if (response.ok) {
+                setLastFestivalAction("updateStatus");
+                setFestivalActionMessage(body?.message || "축제 상태(진행중/종료) 수동 갱신이 완료되었습니다.");
+                setFestivalSyncResult(null); // 이전 동기화 결과값 초기화
+            } else {
+                setFestivalActionError(
+                    body?.message || raw || "축제 상태 갱신에 실패했습니다."
+                );
+            }
+        } catch (error) {
+            console.error("축제 상태 갱신 오류:", error);
+            setFestivalActionError(
+                error instanceof Error ? error.message : "서버 통신 중 오류가 발생했습니다."
+            );
+        } finally {
+            setFestivalActionLoading(false);
+        }
+    };
+
     useEffect(() => {
         if (activeTab === "members") void fetchMembers();
         if (activeTab === "reviews") void fetchReportedReviews();
@@ -539,7 +586,7 @@ export default function AdminPage() {
                                                     <div className="font-semibold text-slate-900 truncate" title={member.nickname}>{member.nickname}</div>
                                                     <div className="text-xs text-slate-400 truncate" title={member.loginId}>{member.loginId}</div>
                                                 </td>
-                                                
+
                                                 {/* 이메일 말줄임표 제거 및 강제 줄바꿈 처리 */}
                                                 <td className="px-6 py-4 break-all" title={member.email}>
                                                     {member.email}
@@ -669,6 +716,14 @@ export default function AdminPage() {
                                     >
                                         상세 미완료 재처리
                                     </button>
+                                    <button
+                                        onClick={() => void runFestivalStatusUpdate()}
+                                        disabled={festivalActionLoading}
+                                        className="rounded-lg border border-purple-300 bg-purple-50 px-4 py-2.5 text-sm font-semibold text-purple-700 transition hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        ⏳ 축제 상태 새로고침
+                                    </button>
+                                
 
                                     <button
                                         onClick={() => void fetchFestivalSyncStatus({ clearResult: true })}
@@ -748,8 +803,8 @@ export default function AdminPage() {
                                         <h3 className="text-lg font-bold text-slate-800">현재 상세 동기화 미완료 건수</h3>
                                         <span
                                             className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${festivalSyncStatus.needsRetry
-                                                    ? "bg-amber-100 text-amber-700"
-                                                    : "bg-green-100 text-green-700"
+                                                ? "bg-amber-100 text-amber-700"
+                                                : "bg-green-100 text-green-700"
                                                 }`}
                                         >
                                             {festivalSyncStatus.needsRetry ? "재처리 필요" : "정상"}
