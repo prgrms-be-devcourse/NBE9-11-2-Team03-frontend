@@ -10,7 +10,7 @@ type MyInfo = {
   nickname: string;
   reviewCount: number;
   bookMarkCount: number;
-  role?: "USER" | "ADMIN"
+  role?: "USER" | "ADMIN";
 };
 
 type MeResponse = {
@@ -18,8 +18,9 @@ type MeResponse = {
   message: string;
   data: MyInfo;
 };
+
 type ApiErrorResponse = {
-  status: number;
+  status: number | string; // 백엔드에서 문자열 "401"로 올 수 있으므로 string 추가
   message: string;
   data: null;
 };
@@ -92,7 +93,11 @@ const BOOKMARKS_PAGE_SIZE = 5;
 function isApiErrorResponse(value: unknown): value is ApiErrorResponse {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
-  return typeof v.status === "number" && typeof v.message === "string";
+  // status가 숫자이거나 문자열일 때 모두 통과하도록 수정
+  return (
+    (typeof v.status === "number" || typeof v.status === "string") &&
+    typeof v.message === "string"
+  );
 }
 
 export default function MyPage() {
@@ -155,16 +160,14 @@ export default function MyPage() {
         | null;
 
       if (!response.ok) {
-        const message =
+        // 백엔드에서 JSON으로 message를 보내줬다면 그 메시지를 그대로 빼옵니다.
+        const errorMessage =
           body && isApiErrorResponse(body)
             ? body.message
             : `회원 탈퇴 실패 (${response.status})`;
 
-        if (response.status === 401) {
-          setIsLoggedIn(false);
-        }
-
-        throw new Error(message);
+        // 빼온 메시지를 모달 화면에 띄우기 위해 에러로 던집니다.
+        throw new Error(errorMessage);
       }
 
       closeWithdrawModal();
@@ -177,19 +180,18 @@ export default function MyPage() {
       setWithdrawError(
         err instanceof Error
           ? err.message
-          : "회원 탈퇴 처리 중 오류가 발생했습니다.",
+          : "회원 탈퇴 처리 중 오류가 발생했습니다."
       );
     } finally {
       setWithdrawSubmitting(false);
     }
-  }, [
-    closeWithdrawModal,
-    withdrawPassword,
-    withdrawPasswordConfirm,
-  ]);
+  }, [closeWithdrawModal, withdrawPassword, withdrawPasswordConfirm]);
 
-  const fetchMyInfo = useCallback(async () => {
-    setLoading(true);
+  // 백그라운드 동기화 여부를 받아 전체 로딩(setLoading)을 제어하도록 변경
+  const fetchMyInfo = useCallback(async (isBackgroundSync = false) => {
+    if (!isBackgroundSync) {
+      setLoading(true);
+    }
     setError(null);
 
     setIsLoggedIn(true);
@@ -229,20 +231,27 @@ export default function MyPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "내 정보를 불러오는 중 오류가 발생했습니다.",
+          : "내 정보를 불러오는 중 오류가 발생했습니다."
       );
     } finally {
-      setLoading(false);
+      if (!isBackgroundSync) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
+    // 포커스(백그라운드 동기화)일 때와 처음 렌더링 시를 구분
     const syncMyInfo = () => {
-      void fetchMyInfo();
+      void fetchMyInfo(true); // true 전달: 화면 깜빡임 방지
+    };
+
+    const initialFetch = () => {
+      void fetchMyInfo(false); // false 전달: 초기 로딩 화면 띄움
     };
 
     // 뒤로가기나 탭 복귀 시 내 정보를 다시 불러와서 로그인 상태를 확인한다.
-    const timer = window.setTimeout(syncMyInfo, 0);
+    const timer = window.setTimeout(initialFetch, 0);
     window.addEventListener("pageshow", syncMyInfo);
     window.addEventListener("focus", syncMyInfo);
 
@@ -293,7 +302,7 @@ export default function MyPage() {
       setReviewsError(
         err instanceof Error
           ? err.message
-          : "내 리뷰를 불러오는 중 오류가 발생했습니다.",
+          : "내 리뷰를 불러오는 중 오류가 발생했습니다."
       );
     } finally {
       setReviewsLoading(false);
@@ -320,7 +329,7 @@ export default function MyPage() {
         `/api/users/me/bookmarks?${query.toString()}`,
         {
           method: "GET",
-        },
+        }
       );
 
       const body = (await response.json().catch(() => null)) as
@@ -348,7 +357,7 @@ export default function MyPage() {
       setBookmarksError(
         err instanceof Error
           ? err.message
-          : "찜한 축제 목록을 불러오는 중 오류가 발생했습니다.",
+          : "찜한 축제 목록을 불러오는 중 오류가 발생했습니다."
       );
     } finally {
       setBookmarksLoading(false);
@@ -411,8 +420,6 @@ export default function MyPage() {
     );
   }
   return (
-
-
     <div className="min-h-screen bg-slate-50 py-12 px-4 md:px-8">
       <div className="mx-auto flex w-full flex-col gap-8 md:flex-row">
         {withdrawModalOpen ? (
@@ -476,9 +483,12 @@ export default function MyPage() {
                 </div>
               </div>
 
-              {withdrawError ? (
-                <p className="mt-3 text-sm text-red-600">{withdrawError}</p>
-              ) : null}
+              {/* 에러 메시지가 렌더링될 때 모달 크기가 덜컹거리는 것 방지 */}
+              <div className="mt-3 min-h-[20px]">
+                {withdrawError ? (
+                  <p className="text-sm text-red-600">{withdrawError}</p>
+                ) : null}
+              </div>
 
               <div className="mt-6 flex justify-end gap-2">
                 <button
@@ -509,30 +519,33 @@ export default function MyPage() {
             <nav className="flex flex-col gap-2">
               <button
                 onClick={() => setActiveTab("profile")}
-                className={`flex w-full items-center rounded-xl px-4 py-3.5 text-base font-semibold transition-colors ${activeTab === "profile"
+                className={`flex w-full items-center rounded-xl px-4 py-3.5 text-base font-semibold transition-colors ${
+                  activeTab === "profile"
                     ? "bg-blue-50 text-blue-700"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                  }`}
+                }`}
               >
                 내 프로필
               </button>
 
               <button
                 onClick={() => setActiveTab("reviews")}
-                className={`flex w-full items-center rounded-xl px-4 py-3.5 text-base font-semibold transition-colors ${activeTab === "reviews"
+                className={`flex w-full items-center rounded-xl px-4 py-3.5 text-base font-semibold transition-colors ${
+                  activeTab === "reviews"
                     ? "bg-blue-50 text-blue-700"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                  }`}
+                }`}
               >
                 내가 단 리뷰
               </button>
 
               <button
                 onClick={() => setActiveTab("bookmarks")}
-                className={`flex w-full items-center rounded-xl px-4 py-3.5 text-base font-semibold transition-colors ${activeTab === "bookmarks"
+                className={`flex w-full items-center rounded-xl px-4 py-3.5 text-base font-semibold transition-colors ${
+                  activeTab === "bookmarks"
                     ? "bg-blue-50 text-blue-700"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                  }`}
+                }`}
               >
                 내가 찜한 축제
               </button>
@@ -542,7 +555,9 @@ export default function MyPage() {
               <div className="mt-4 border-t border-slate-100 pt-4">
                 <div className="flex items-center gap-2 mb-2 px-2">
                   <span className="flex h-2 w-2 rounded-full bg-red-500"></span>
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Admin Only</span>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Admin Only
+                  </span>
                 </div>
                 <Link
                   href="/admin"
@@ -568,18 +583,18 @@ export default function MyPage() {
 
         {/*오른쪽: 메인 콘텐츠 영역 */}
         <main className="flex-1">
-
           {/*내 프로필 탭 */}
           {activeTab === "profile" && (
             <div className="space-y-8 animate-in fade-in duration-300">
               {/* 프로필 카드  */}
               <section className="flex items-center gap-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
                 <div>
-                  <div className="flex flex-col gap-1"> {/* 세로 정렬을 위해 div로 감싸고 간격을 줍니다 */}
-
+                  <div className="flex flex-col gap-1">
                     {/* 닉네임 영역 */}
                     <div className="flex items-baseline gap-2">
-                      <span className="text-xs font-medium text-slate-400 w-12">닉네임</span>
+                      <span className="text-xs font-medium text-slate-400 w-12">
+                        닉네임
+                      </span>
                       <h2 className="text-2xl font-bold text-slate-900">
                         {myInfo?.nickname ?? "이름 없음"}
                       </h2>
@@ -587,12 +602,13 @@ export default function MyPage() {
 
                     {/* 이메일 영역 */}
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs font-medium text-slate-400 w-12">이메일</span>
+                      <span className="text-xs font-medium text-slate-400 w-12">
+                        이메일
+                      </span>
                       <p className="text-base text-slate-500">
                         {myInfo?.email ?? "이메일 정보 없음"}
                       </p>
                     </div>
-
                   </div>
                 </div>
               </section>
@@ -644,9 +660,9 @@ export default function MyPage() {
               ) : null}
 
               {!reviewsLoading &&
-                !reviewsError &&
-                myReviews &&
-                myReviews.content.length > 0 ? (
+              !reviewsError &&
+              myReviews &&
+              myReviews.content.length > 0 ? (
                 <>
                   <ul className="mt-5 space-y-3">
                     {myReviews.content.map((review) => (
@@ -694,7 +710,7 @@ export default function MyPage() {
                         type="button"
                         onClick={() =>
                           setReviewsPage((prev) =>
-                            myReviews.hasNext ? prev + 1 : prev,
+                            myReviews.hasNext ? prev + 1 : prev
                           )
                         }
                         disabled={!myReviews.hasNext}
@@ -733,17 +749,17 @@ export default function MyPage() {
               ) : null}
 
               {!bookmarksLoading &&
-                !bookmarksError &&
-                myBookmarks?.content.length === 0 ? (
+              !bookmarksError &&
+              myBookmarks?.content.length === 0 ? (
                 <p className="mt-3 text-base text-slate-500">
                   아직 찜한 축제가 없습니다.
                 </p>
               ) : null}
 
               {!bookmarksLoading &&
-                !bookmarksError &&
-                myBookmarks &&
-                myBookmarks.content.length > 0 ? (
+              !bookmarksError &&
+              myBookmarks &&
+              myBookmarks.content.length > 0 ? (
                 <>
                   <ul className="mt-5 space-y-3">
                     {myBookmarks.content.map((bookmark) => (
@@ -795,7 +811,7 @@ export default function MyPage() {
                         type="button"
                         onClick={() =>
                           setBookmarksPage((prev) =>
-                            myBookmarks.hasNext ? prev + 1 : prev,
+                            myBookmarks.hasNext ? prev + 1 : prev
                           )
                         }
                         disabled={!myBookmarks.hasNext}
@@ -809,7 +825,6 @@ export default function MyPage() {
               ) : null}
             </div>
           )}
-
         </main>
       </div>
     </div>
